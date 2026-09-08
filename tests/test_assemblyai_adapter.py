@@ -53,6 +53,8 @@ def test_audio_contract_is_pcm16_mono_16khz_by_default() -> None:
         "encoding": "pcm_s16le",
         "channels": 1,
         "sample_rate": 16000,
+        "recommended_chunk_ms_min": 50,
+        "recommended_chunk_ms_max": 1000,
     }
 
 
@@ -70,6 +72,28 @@ def test_agent_context_updates_live_client_without_recording_content() -> None:
     assert event.kind == "assemblyai_agent_context_updated"
     assert event.data["content_recorded"] is False
     assert "Detecté" not in str(event.data)
+
+
+def test_agent_reply_callback_refreshes_context_after_final_turn() -> None:
+    gateway = VoiceGateway()
+    adapter = AssemblyAIStreamingAdapter(
+        gateway,
+        api_key="test-key-not-used",
+        agent_reply_fn=lambda result: str(result["message"]),
+    )
+    fake = FakeStreamingClient()
+    adapter._client = fake
+
+    result = adapter.handle_turn("Revisa la alarma", end_of_turn=True)
+
+    assert result is not None
+    assert result["status"] == "approval_required"
+    assert adapter.state.agent_replies == 1
+    assert adapter.state.context_updates == 1
+    assert fake.contexts == [adapter.state.last_agent_reply]
+    prepared = [e for e in gateway.evidence.events if e.kind == "voiceops_agent_reply_prepared"]
+    assert len(prepared) == 1
+    assert prepared[0].data["content_recorded"] is False
 
 
 def test_close_always_terminates_live_session() -> None:

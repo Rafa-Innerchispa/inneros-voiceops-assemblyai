@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Callable
 
 from voiceops.gateway import VoiceGateway
+
+
+AgentReplyFn = Callable[[dict[str, object]], str | None]
 
 
 @dataclass(slots=True)
@@ -14,8 +17,10 @@ class StreamingState:
     final_turns: int = 0
     partial_turns: int = 0
     context_updates: int = 0
+    agent_replies: int = 0
     errors: list[str] = field(default_factory=list)
     last_gateway_result: dict[str, object] | None = None
+    last_agent_reply: str | None = None
 
 
 class AssemblyAIStreamingAdapter:
@@ -28,6 +33,7 @@ class AssemblyAIStreamingAdapter:
     - PCM16
     - mono
     - 16 kHz by default
+    - chunks should be 50-1000 ms and no faster than real time
     - explicit session termination
 
     VoiceOps owns governance/orchestration. AssemblyAI owns speech recognition.
@@ -43,6 +49,7 @@ class AssemblyAIStreamingAdapter:
         api_key: str | None = None,
         speech_model: str = "universal-3-5-pro",
         sample_rate: int = 16000,
+        agent_reply_fn: AgentReplyFn | None = None,
     ) -> None:
         if sample_rate <= 0:
             raise ValueError("sample_rate must be positive")
@@ -50,6 +57,7 @@ class AssemblyAIStreamingAdapter:
         self.api_key = api_key or os.getenv("ASSEMBLYAI_API_KEY")
         self.speech_model = speech_model
         self.sample_rate = sample_rate
+        self.agent_reply_fn = agent_reply_fn
         self.state = StreamingState()
         self._client: Any = None
 
@@ -59,7 +67,26 @@ class AssemblyAIStreamingAdapter:
             "encoding": self.AUDIO_ENCODING,
             "channels": self.AUDIO_CHANNELS,
             "sample_rate": self.sample_rate,
+            "recommended_chunk_ms_min": 50,
+            "recommended_chunk_ms_max": 1000,
         }
+
+    def _handle_agent_reply(self, result: dict[str, object]) -> None:
+        if self.agent_reply_fn is None:
+            return
+        reply = self.agent_reply_fn(result)
+        if reply is None or not reply.strip():
+            return
+        normalized = reply.strip()
+        self.state.agent_replies += 1
+        self.state.last_agent_reply = normalized
+        self.gateway.evidence.add_event(
+            "voiceops_agent_reply_prepared",
+            character_count=len(normalized),
+            content_recorded=False,
+        )
+        if self._client is not None:
+            self.update_agent_context(normalized)
 
     def handle_turn(self, transcript: str, *, end_of_turn: bool) -> dict[str, object] | None:
         if not transcript.strip():
@@ -70,6 +97,7 @@ class AssemblyAIStreamingAdapter:
         self.state.final_turns += 1
         result = self.gateway.process_final_transcript(transcript)
         self.state.last_gateway_result = result
+        self._handle_agent_reply(result)
         return result
 
     def connect(self, *, agent_context: str | None = None) -> None:
@@ -132,12 +160,7 @@ class AssemblyAIStreamingAdapter:
         self._client.connect(StreamingParameters(**params))
 
     def update_agent_context(self, text: str) -> None:
-        """Refresh STT context after an agent reply without storing reply content.
-
-        AssemblyAI recommends updating agent_context during a live conversation.
-        Evidence intentionally records only metadata, not the potentially sensitive
-        spoken/agent text itself.
-        """
+        """Refresh STT context after an agent reply without storing reply content."""
         normalized = text.strip()
         if not normalized:
             raise ValueError("agent_context must not be empty")
