@@ -251,3 +251,17 @@ If implementation and documentation disagree, update the documentation in the sa
 ## License
 
 Apache-2.0. See `LICENSE`.
+
+
+## Implementation checkpoint — 2026-09-08
+
+- Voice Gateway session/correlation/turn state: implemented.
+- Explicit voice approval gate: implemented and fail-closed on ambiguous or negated phrases.
+- Synthetic building/service workflow: implemented; demo-only work orders execute only after approval.
+- Audit evidence plus captured-state replay summary: implemented.
+- HTR truth boundary: implemented with explicit `MEASURED` vs `ESTIMATED` classification.
+- Local-first reasoning adapter contract: implemented; offline tests use deterministic synthetic reasoning while live InnerOS/AMD plugs in through the adapter boundary.
+- AssemblyAI v3 streaming adapter: implemented with lazy optional dependency, final-turn routing, lifecycle/error evidence, and explicit `disconnect(terminate=True)` shutdown.
+- Automated tests and compile checks: passing locally.
+- Live AssemblyAI microphone/API-key validation: pending.
+- Live InnerOS Resource Fabric / AMD .5 reasoning binding: pending.
