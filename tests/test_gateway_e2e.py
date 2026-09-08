@@ -33,9 +33,12 @@ def test_consequential_action_never_executes_on_ambiguous_reply() -> None:
     assert gateway.pending_approval is True
 
 
-def test_evidence_captures_state_snapshot_not_live_refetch() -> None:
+def test_evidence_captures_guardian_snapshot_not_live_refetch() -> None:
     gateway = VoiceGateway()
     gateway.process_final_transcript("Revisa la alarma")
     snapshots = [event for event in gateway.evidence.events if event.kind == "state_snapshot"]
     assert len(snapshots) == 1
-    assert snapshots[0].data["snapshot"]["source"] == "synthetic_fixture"
+    snapshot = snapshots[0].data["snapshot"]
+    assert snapshot["source"] == "synthetic_guardian_adapter"
+    assert snapshot["contract_projection"] == "NormalizedEvent"
+    assert snapshot["contract_owner"] == "Rafa-Innerchispa/inneros-physical-guardian"
