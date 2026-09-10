@@ -36,6 +36,15 @@ button.primary { background: linear-gradient(135deg, #1677ff, #5e62ff); border-c
 button.approve { background: rgba(94,228,167,.13); border-color: rgba(94,228,167,.5); color: var(--green); }
 button.secondary { background: #12243b; }
 button.ghost { background: transparent; }
+.live-strip { margin-bottom: 16px; padding: 14px 18px; display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 10px 18px; border-color: rgba(73,215,255,.24); }
+.live-strip strong { display: block; margin-top: 5px; font-size: .82rem; letter-spacing: .04em; }
+.capability-row { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 7px; }
+.capability { padding: 5px 8px; border-radius: 999px; border: 1px solid rgba(73,215,255,.2); color: #badff3; font-size: .68rem; background: rgba(73,215,255,.04); }
+.agent-transcript { grid-column: 1 / -1; color: var(--muted); padding-top: 9px; border-top: 1px solid rgba(255,255,255,.05); font-size: .84rem; }
+.live-status.ready { color: var(--green); }
+.live-status.active { color: var(--cyan); }
+.live-status.warning { color: var(--amber); }
+.live-status.blocked { color: var(--red); }
 .grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 16px; }
 .panel { padding: 18px; min-height: 250px; }
 .panel-head, .evidence-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin: 8px 0 14px; }
@@ -68,15 +77,14 @@ dialog { width: min(900px, calc(100% - 32px)); max-height: 80vh; background: #09
 dialog::backdrop { background: rgba(0,0,0,.72); backdrop-filter: blur(4px); }
 .dialog-head { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: #091524; }
 pre { margin: 0; padding: 16px; overflow: auto; font-size: .8rem; line-height: 1.45; color: #cce3ff; }
-
 .state.ready { color: var(--cyan); border-color: rgba(73,215,255,.4); }
 .state.active { color: var(--violet); border-color: rgba(154,140,255,.45); }
 .state.warning { color: var(--amber); border-color: rgba(255,199,102,.5); }
 .state.success { color: var(--green); border-color: rgba(94,228,167,.5); }
 .state.blocked { color: var(--red); border-color: rgba(255,122,144,.5); }
-
 @media (max-width: 900px) {
   .topbar, .controls, .evidence-footer { flex-direction: column; align-items: stretch; }
-  .badges, .ids { justify-content: flex-start; }
+  .badges, .ids, .capability-row { justify-content: flex-start; }
+  .live-strip { grid-template-columns: 1fr; }
   .grid { grid-template-columns: 1fr; }
 }

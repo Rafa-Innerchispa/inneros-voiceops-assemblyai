@@ -27,11 +27,29 @@
         <div id="demoStatus" class="status-line">Ready for an operational intent.</div>
       </div>
       <div class="control-row">
-        <button id="runBtn" class="primary">▶ Run demo intent</button>
+        <button id="liveVoiceBtn" class="primary">🎙 Start AssemblyAI Voice Agent</button>
+        <button id="stopVoiceBtn" class="ghost" disabled>Stop voice</button>
+        <button id="runBtn" class="secondary">▶ Run transcript fixture</button>
         <button id="approveBtn" class="approve" disabled>✓ Say “Yes, authorize”</button>
         <button id="ambiguousBtn" class="secondary" disabled>Try ambiguous approval</button>
         <button id="resetBtn" class="ghost">Reset</button>
       </div>
+    </section>
+
+    <section class="live-strip card">
+      <div>
+        <div class="step-label">ASSEMBLYAI LIVE STACK</div>
+        <strong id="voiceAgentStatus">OFFLINE / TOKEN NOT REQUESTED</strong>
+      </div>
+      <div class="capability-row">
+        <span class="capability">Voice Agent API</span>
+        <span class="capability">Neural turn detection</span>
+        <span class="capability">Barge-in</span>
+        <span class="capability">Native TTS</span>
+        <span class="capability">Tool calling</span>
+        <span class="capability">Short-lived browser token</span>
+      </div>
+      <div id="agentTranscript" class="agent-transcript">Agent voice transcript will appear here during a live session.</div>
     </section>
 
     <section class="grid">
@@ -41,10 +59,11 @@
           <h2>AssemblyAI input</h2>
           <span id="voiceState" class="state">READY</span>
         </div>
-        <div class="metric"><span>Target speech model</span><strong>Universal-3.5 Pro</strong></div>
-        <div class="metric"><span>Transport</span><strong>PCM16 · mono · 16 kHz</strong></div>
+        <div class="metric"><span>Streaming model</span><strong>Universal-3.5 Pro Realtime</strong></div>
+        <div class="metric"><span>Managed voice audio</span><strong>PCM16 · mono · 24 kHz</strong></div>
+        <div class="metric"><span>Custom STT lane</span><strong>PCM16 · mono · 16 kHz</strong></div>
         <div class="transcript" id="transcript">No transcript yet.</div>
-        <div class="fineprint">This judge UI currently uses a reproducible transcript fixture. The live AssemblyAI adapter is implemented separately and is only labeled live when a provider session is actually connected.</div>
+        <div class="fineprint">Live mode uses AssemblyAI Voice Agent API with neural turn detection, partial/final transcripts, native TTS, interruption handling and tool calling. Fixture mode stays available for deterministic judging and offline recovery.</div>
       </article>
 
       <article class="card panel">
