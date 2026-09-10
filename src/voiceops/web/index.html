@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>InnerOS VoiceOps Demo</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div>
+        <div class="eyebrow">INNEROS VOICEOPS</div>
+        <h1>Governed voice execution for the physical world</h1>
+        <p>Voice → Guardian → Reasoning → Approval → Action → Evidence</p>
+      </div>
+      <div class="badges">
+        <span class="badge badge-local">LOCAL-FIRST POLICY</span>
+        <span class="badge">DEMO ENVIRONMENT</span>
+        <span class="badge">NO PRODUCTION WRITES</span>
+      </div>
+    </header>
+
+    <section class="controls card">
+      <div>
+        <div class="step-label">DEMO CONTROL</div>
+        <div id="demoStatus" class="status-line">Ready for an operational intent.</div>
+      </div>
+      <div class="control-row">
+        <button id="runBtn" class="primary">▶ Run demo intent</button>
+        <button id="approveBtn" class="approve" disabled>✓ Say “Yes, authorize”</button>
+        <button id="ambiguousBtn" class="secondary" disabled>Try ambiguous approval</button>
+        <button id="resetBtn" class="ghost">Reset</button>
+      </div>
+    </section>
+
+    <section class="grid">
+      <article class="card panel">
+        <div class="step-label">1 · VOICE</div>
+        <div class="panel-head">
+          <h2>AssemblyAI input</h2>
+          <span id="voiceState" class="state">READY</span>
+        </div>
+        <div class="metric"><span>Target speech model</span><strong>Universal-3.5 Pro</strong></div>
+        <div class="metric"><span>Transport</span><strong>PCM16 · mono · 16 kHz</strong></div>
+        <div class="transcript" id="transcript">No transcript yet.</div>
+        <div class="fineprint">This judge UI currently uses a reproducible transcript fixture. The live AssemblyAI adapter is implemented separately and is only labeled live when a provider session is actually connected.</div>
+      </article>
+
+      <article class="card panel">
+        <div class="step-label">2 · PHYSICAL GUARDIAN</div>
+        <div class="panel-head">
+          <h2>Normalized event</h2>
+          <span id="guardianState" class="state">WAITING</span>
+        </div>
+        <div id="guardianEmpty" class="empty">No incident received.</div>
+        <div id="guardianData" class="data-stack hidden"></div>
+      </article>
+
+      <article class="card panel">
+        <div class="step-label">3 · REASONING ROUTE</div>
+        <div class="panel-head">
+          <h2 id="reasoningTitle">InnerOS reasoner</h2>
+          <span id="amdState" class="state">WAITING</span>
+        </div>
+        <div class="metric"><span>Provider</span><strong id="routeProvider">—</strong></div>
+        <div class="metric"><span>Model</span><strong id="routeModel">—</strong></div>
+        <div class="metric"><span>Policy</span><strong id="routePolicy">—</strong></div>
+        <div class="metric"><span>External fallback</span><strong id="routeFallback">—</strong></div>
+        <div class="metric"><span>Evidence class</span><strong id="routeTruth">—</strong></div>
+      </article>
+
+      <article class="card panel action-card">
+        <div class="step-label">4 · GOVERNED ACTION</div>
+        <div class="panel-head">
+          <h2>Action gate</h2>
+          <span id="actionState" class="state">WAITING</span>
+        </div>
+        <div id="proposalEmpty" class="empty">No action proposed.</div>
+        <div id="proposalData" class="data-stack hidden"></div>
+        <div id="approvalGate" class="approval-gate hidden">HUMAN APPROVAL REQUIRED</div>
+        <div id="actionResult" class="result hidden"></div>
+      </article>
+    </section>
+
+    <section class="card evidence-card">
+      <div class="evidence-head">
+        <div>
+          <div class="step-label">5 · DECISION EVIDENCE</div>
+          <h2>Forensic trace</h2>
+        </div>
+        <div class="ids">
+          <span>Session <code id="sessionId">—</code></span>
+          <span>Correlation <code id="correlationId">—</code></span>
+        </div>
+      </div>
+      <div id="timeline" class="timeline"></div>
+      <div class="evidence-footer">
+        <div id="htrBox" class="htr">HTR appears after an approved action.</div>
+        <div class="control-row">
+          <button id="evidenceBtn" class="secondary">View evidence</button>
+          <button id="replayBtn" class="secondary">Replay decision</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="jsonDialog">
+    <div class="dialog-head">
+      <strong id="dialogTitle">Evidence</strong>
+      <button id="closeDialog" class="ghost">Close</button>
+    </div>
+    <pre id="jsonOutput"></pre>
+  </dialog>
+
+  <script src="/app.js" defer></script>
+</body>
+</html>
