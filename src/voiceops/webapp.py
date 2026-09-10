@@ -28,6 +28,13 @@ VOICE_AGENT_TOKEN_TTL_SECONDS = 120
 VOICE_AGENT_TOKEN_RATE_LIMIT_SECONDS = 5.0
 
 
+def _env_truthy(name: str, default: bool = False) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
 class DemoSessionStore:
     """Thread-safe in-memory state for the judge-facing demo."""
 
@@ -226,6 +233,17 @@ class VoiceOpsHandler(BaseHTTPRequestHandler):
         return
 
     def do_GET(self) -> None:  # noqa: N802
+        if self.path == "/healthz":
+            self._send_json(
+                {
+                    "ok": True,
+                    "service": "inneros-voiceops",
+                    "live_voice_enabled": bool(self.server.live_voice_enabled),  # type: ignore[attr-defined]
+                    "credential_configured": bool(os.getenv("ASSEMBLYAI_API_KEY")),
+                    "production_writes": False,
+                }
+            )
+            return
         if self.path == "/api/state":
             state = self.store.snapshot()
             state["assemblyai_voice_agent_enabled"] = bool(self.server.live_voice_enabled)  # type: ignore[attr-defined]
@@ -355,17 +373,22 @@ class VoiceOpsDemoServer(ThreadingHTTPServer):
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="InnerOS VoiceOps judge demo web UI")
-    parser.add_argument("--host", default="127.0.0.1")
-    parser.add_argument("--port", type=int, default=8765)
+    parser.add_argument("--host", default=os.getenv("VOICEOPS_HOST", "127.0.0.1"))
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=int(os.getenv("PORT", os.getenv("VOICEOPS_PORT", "8765"))),
+    )
     parser.add_argument(
         "--reasoner",
         choices=("synthetic", "amd5"),
-        default="synthetic",
+        default=os.getenv("VOICEOPS_REASONER", "synthetic"),
         help="Use offline-safe synthetic reasoning or the existing local AMD .5 runtime.",
     )
     parser.add_argument(
         "--enable-live-assemblyai",
         action="store_true",
+        default=_env_truthy("VOICEOPS_ENABLE_LIVE_ASSEMBLYAI"),
         help="Enable short-lived browser Voice Agent tokens. Requires ASSEMBLYAI_API_KEY server-side.",
     )
     args = parser.parse_args()

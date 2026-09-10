@@ -35,6 +35,11 @@ def test_http_server_serves_ui_and_governed_api_flow() -> None:
         assert "InnerOS VoiceOps" in page
         assert "NO PROD WRITES" in page
 
+        health = _get_json(base + "/healthz")
+        assert health["ok"] is True
+        assert health["service"] == "inneros-voiceops"
+        assert health["production_writes"] is False
+
         initial = _get_json(base + "/api/state")
         assert initial["production_writes"] is False
 
