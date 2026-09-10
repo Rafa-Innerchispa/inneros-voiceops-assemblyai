@@ -16,27 +16,20 @@ class StreamingState:
     provider_session_id: str | None = None
     final_turns: int = 0
     partial_turns: int = 0
+    held_turns: int = 0
     context_updates: int = 0
     agent_replies: int = 0
+    last_end_of_turn_confidence: float | None = None
     errors: list[str] = field(default_factory=list)
     last_gateway_result: dict[str, object] | None = None
     last_agent_reply: str | None = None
 
 
 class AssemblyAIStreamingAdapter:
-    """Thin AssemblyAI v3 streaming adapter around the governed VoiceGateway.
+    """AssemblyAI v3 streaming adapter around the governed VoiceGateway.
 
-    The AssemblyAI SDK is imported lazily so the core demo and tests remain
-    runnable without cloud credentials or optional audio dependencies.
-
-    Live audio contract for Universal-3.5 Pro Realtime:
-    - PCM16
-    - mono
-    - 16 kHz by default
-    - chunks should be 50-1000 ms and no faster than real time
-    - explicit session termination
-
-    VoiceOps owns governance/orchestration. AssemblyAI owns speech recognition.
+    This is the custom-pipeline lane used when InnerOS owns LLM reasoning and TTS.
+    The managed Voice Agent API is integrated separately by the judge browser UI.
     """
 
     AUDIO_ENCODING = "pcm_s16le"
@@ -49,14 +42,18 @@ class AssemblyAIStreamingAdapter:
         api_key: str | None = None,
         speech_model: str = "universal-3-5-pro",
         sample_rate: int = 16000,
+        min_end_of_turn_confidence: float = 0.5,
         agent_reply_fn: AgentReplyFn | None = None,
     ) -> None:
         if sample_rate <= 0:
             raise ValueError("sample_rate must be positive")
+        if not 0.0 <= min_end_of_turn_confidence <= 1.0:
+            raise ValueError("min_end_of_turn_confidence must be between 0 and 1")
         self.gateway = gateway
         self.api_key = api_key or os.getenv("ASSEMBLYAI_API_KEY")
         self.speech_model = speech_model
         self.sample_rate = sample_rate
+        self.min_end_of_turn_confidence = min_end_of_turn_confidence
         self.agent_reply_fn = agent_reply_fn
         self.state = StreamingState()
         self._client: Any = None
@@ -88,13 +85,42 @@ class AssemblyAIStreamingAdapter:
         if self._client is not None:
             self.update_agent_context(normalized)
 
-    def handle_turn(self, transcript: str, *, end_of_turn: bool) -> dict[str, object] | None:
+    def handle_turn(
+        self,
+        transcript: str,
+        *,
+        end_of_turn: bool,
+        end_of_turn_confidence: float | None = None,
+    ) -> dict[str, object] | None:
         if not transcript.strip():
             return None
+        if end_of_turn_confidence is not None:
+            confidence = float(end_of_turn_confidence)
+            if not 0.0 <= confidence <= 1.0:
+                raise ValueError("end_of_turn_confidence must be between 0 and 1")
+            self.state.last_end_of_turn_confidence = confidence
         if not end_of_turn:
             self.state.partial_turns += 1
             return None
+        if (
+            end_of_turn_confidence is not None
+            and end_of_turn_confidence < self.min_end_of_turn_confidence
+        ):
+            self.state.held_turns += 1
+            self.gateway.evidence.add_event(
+                "assemblyai_turn_held",
+                end_of_turn_confidence=float(end_of_turn_confidence),
+                minimum_confidence=self.min_end_of_turn_confidence,
+                transcript_recorded=False,
+            )
+            return None
+
         self.state.final_turns += 1
+        self.gateway.evidence.add_event(
+            "assemblyai_turn_accepted",
+            end_of_turn_confidence=end_of_turn_confidence,
+            minimum_confidence=self.min_end_of_turn_confidence,
+        )
         result = self.gateway.process_final_transcript(transcript)
         self.state.last_gateway_result = result
         self._handle_agent_reply(result)
@@ -126,12 +152,14 @@ class AssemblyAIStreamingAdapter:
                 provider_session_id=self.state.provider_session_id,
                 speech_model=self.speech_model,
                 audio_contract=self.audio_contract,
+                min_end_of_turn_confidence=self.min_end_of_turn_confidence,
             )
 
         def on_turn(_client: Any, event: Any) -> None:
             self.handle_turn(
                 getattr(event, "transcript", ""),
                 end_of_turn=bool(getattr(event, "end_of_turn", False)),
+                end_of_turn_confidence=getattr(event, "end_of_turn_confidence", None),
             )
 
         def on_termination(_client: Any, event: Any) -> None:
@@ -160,7 +188,6 @@ class AssemblyAIStreamingAdapter:
         self._client.connect(StreamingParameters(**params))
 
     def update_agent_context(self, text: str) -> None:
-        """Refresh STT context after an agent reply without storing reply content."""
         normalized = text.strip()
         if not normalized:
             raise ValueError("agent_context must not be empty")

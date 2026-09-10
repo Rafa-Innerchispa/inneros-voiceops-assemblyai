@@ -2,11 +2,15 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import threading
+import time
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Callable
+from urllib.parse import urlencode
+from urllib.request import Request, urlopen
 
 from .adapters.local_amd import LocalAMDReasoner
 from .audit import replay_summary
@@ -19,15 +23,13 @@ DEFAULT_INTENT = (
     "Ralphi, revisa la incidencia del acceso norte y abre una orden tecnica si corresponde."
 )
 DEFAULT_APPROVAL = "Si, autorizo."
+VOICE_AGENT_TOKEN_URL = "https://agents.assemblyai.com/v1/token"
+VOICE_AGENT_TOKEN_TTL_SECONDS = 120
+VOICE_AGENT_TOKEN_RATE_LIMIT_SECONDS = 5.0
 
 
 class DemoSessionStore:
-    """Thread-safe in-memory state for the judge-facing demo.
-
-    The UI is a presentation adapter over VoiceGateway. It does not own Physical
-    Guardian detection, real work-order persistence, or Audit Fabric primitives.
-    The bundled workflow is synthetic and therefore cannot write to production.
-    """
+    """Thread-safe in-memory state for the judge-facing demo."""
 
     def __init__(self, gateway_factory: Callable[[], VoiceGateway] | None = None) -> None:
         self._lock = threading.Lock()
@@ -42,12 +44,24 @@ class DemoSessionStore:
             return self._snapshot_unlocked()
 
     def submit_transcript(self, transcript: str) -> dict[str, Any]:
-        normalized = transcript.strip()
-        if not normalized:
-            raise ValueError("transcript must not be empty")
-        if len(normalized) > MAX_TRANSCRIPT_CHARS:
-            raise ValueError(f"transcript exceeds {MAX_TRANSCRIPT_CHARS} characters")
+        normalized = _normalize_transcript(transcript)
         with self._lock:
+            self._last_result = self._gateway.process_final_transcript(normalized)
+            return self._snapshot_unlocked()
+
+    def submit_intent(self, transcript: str) -> dict[str, Any]:
+        normalized = _normalize_transcript(transcript)
+        with self._lock:
+            if self._gateway.pending_approval:
+                raise ValueError("an approval is already pending")
+            self._last_result = self._gateway.process_final_transcript(normalized)
+            return self._snapshot_unlocked()
+
+    def approve_pending(self, phrase: str) -> dict[str, Any]:
+        normalized = _normalize_transcript(phrase)
+        with self._lock:
+            if not self._gateway.pending_approval:
+                raise ValueError("no action is awaiting approval")
             self._last_result = self._gateway.process_final_transcript(normalized)
             return self._snapshot_unlocked()
 
@@ -62,6 +76,29 @@ class DemoSessionStore:
     def replay(self) -> dict[str, Any]:
         with self._lock:
             return replay_summary(self._gateway.evidence)
+
+    def tool_inspect(self, intent: str) -> dict[str, Any]:
+        state = self.submit_intent(intent)
+        return {
+            "status": state.get("last_result", {}).get("status") if isinstance(state.get("last_result"), dict) else None,
+            "requires_approval": bool(state.get("pending_approval")),
+            "guardian": state.get("guardian"),
+            "route": state.get("route"),
+            "proposal": state.get("proposal"),
+            "correlation_id": state.get("correlation_id"),
+            "production_writes": False,
+        }
+
+    def tool_approve(self, authorization_phrase: str) -> dict[str, Any]:
+        state = self.approve_pending(authorization_phrase)
+        return {
+            "status": state.get("last_result", {}).get("status") if isinstance(state.get("last_result"), dict) else None,
+            "approval": state.get("approval"),
+            "action": state.get("action"),
+            "htr": state.get("htr"),
+            "correlation_id": state.get("correlation_id"),
+            "production_writes": False,
+        }
 
     def _snapshot_unlocked(self) -> dict[str, Any]:
         evidence = self._gateway.evidence
@@ -128,6 +165,15 @@ class DemoSessionStore:
         }
 
 
+def _normalize_transcript(transcript: str) -> str:
+    normalized = transcript.strip()
+    if not normalized:
+        raise ValueError("transcript must not be empty")
+    if len(normalized) > MAX_TRANSCRIPT_CHARS:
+        raise ValueError(f"transcript exceeds {MAX_TRANSCRIPT_CHARS} characters")
+    return normalized
+
+
 def _reasoning_mode(route: dict[str, Any]) -> str:
     if route.get("provider") == "local-amd-5" and route.get("truth") == "LIVE_MODEL_RESPONSE":
         return "amd5_live"
@@ -144,8 +190,29 @@ def build_gateway_factory(reasoner_mode: str) -> Callable[[], VoiceGateway]:
     raise ValueError(f"unsupported reasoner mode: {reasoner_mode}")
 
 
+def mint_voice_agent_token(
+    api_key: str,
+    *,
+    expires_in_seconds: int = VOICE_AGENT_TOKEN_TTL_SECONDS,
+    opener: Callable[..., Any] = urlopen,
+) -> dict[str, Any]:
+    """Mint a short-lived, single-use Voice Agent browser token server-side."""
+    if not api_key.strip():
+        raise ValueError("AssemblyAI API key is not configured")
+    if not 1 <= expires_in_seconds <= 600:
+        raise ValueError("expires_in_seconds must be between 1 and 600")
+    url = VOICE_AGENT_TOKEN_URL + "?" + urlencode({"expires_in_seconds": expires_in_seconds})
+    request = Request(url, headers={"Authorization": f"Bearer {api_key}"}, method="GET")
+    with opener(request, timeout=10) as response:
+        payload = json.loads(response.read().decode("utf-8"))
+    token = payload.get("token") if isinstance(payload, dict) else None
+    if not isinstance(token, str) or not token:
+        raise ValueError("AssemblyAI token response did not include a token")
+    return {"token": token, "expires_in_seconds": expires_in_seconds}
+
+
 class VoiceOpsHandler(BaseHTTPRequestHandler):
-    server_version = "VoiceOpsDemo/0.2"
+    server_version = "VoiceOpsDemo/0.3"
 
     @property
     def store(self) -> DemoSessionStore:
@@ -156,18 +223,22 @@ class VoiceOpsHandler(BaseHTTPRequestHandler):
         return Path(__file__).with_name("web")
 
     def log_message(self, format: str, *args: object) -> None:
-        # Avoid accidental transcript leakage through default HTTP request logs.
         return
 
     def do_GET(self) -> None:  # noqa: N802
         if self.path == "/api/state":
-            self._send_json(self.store.snapshot())
+            state = self.store.snapshot()
+            state["assemblyai_voice_agent_enabled"] = bool(self.server.live_voice_enabled)  # type: ignore[attr-defined]
+            self._send_json(state)
             return
         if self.path == "/api/evidence":
             self._send_json(self.store.evidence())
             return
         if self.path == "/api/replay":
             self._send_json(self.store.replay())
+            return
+        if self.path == "/api/assemblyai/token":
+            self._handle_voice_agent_token()
             return
         static_map = {
             "/": ("index.html", "text/html; charset=utf-8"),
@@ -196,20 +267,53 @@ class VoiceOpsHandler(BaseHTTPRequestHandler):
             if self.path == "/api/reset":
                 self._send_json(self.store.reset())
                 return
-            if self.path in {"/api/intent", "/api/approve"}:
+            if self.path == "/api/intent":
                 payload = self._read_json()
-                default = DEFAULT_INTENT if self.path == "/api/intent" else DEFAULT_APPROVAL
-                transcript = str(payload.get("transcript") or default)
-                self._send_json(self.store.submit_transcript(transcript))
+                self._send_json(self.store.submit_intent(str(payload.get("transcript") or DEFAULT_INTENT)))
+                return
+            if self.path == "/api/approve":
+                payload = self._read_json()
+                self._send_json(self.store.approve_pending(str(payload.get("transcript") or DEFAULT_APPROVAL)))
+                return
+            if self.path == "/api/tool/inspect-and-propose":
+                payload = self._read_json()
+                self._send_json(self.store.tool_inspect(str(payload.get("intent") or DEFAULT_INTENT)))
+                return
+            if self.path == "/api/tool/approve-pending":
+                payload = self._read_json()
+                self._send_json(self.store.tool_approve(str(payload.get("authorization_phrase") or "")))
                 return
             self.send_error(HTTPStatus.NOT_FOUND)
         except (ValueError, json.JSONDecodeError) as exc:
             self._send_json({"error": str(exc)}, status=HTTPStatus.BAD_REQUEST)
         except (OSError, TimeoutError) as exc:
             self._send_json(
-                {"error": f"reasoning provider unavailable: {type(exc).__name__}"},
+                {"error": f"provider unavailable: {type(exc).__name__}"},
                 status=HTTPStatus.BAD_GATEWAY,
             )
+
+    def _handle_voice_agent_token(self) -> None:
+        if not bool(self.server.live_voice_enabled):  # type: ignore[attr-defined]
+            self._send_json(
+                {"error": "live AssemblyAI Voice Agent mode is disabled"},
+                status=HTTPStatus.SERVICE_UNAVAILABLE,
+            )
+            return
+        api_key = os.getenv("ASSEMBLYAI_API_KEY", "")
+        if not api_key:
+            self._send_json(
+                {"error": "AssemblyAI server credential is not configured"},
+                status=HTTPStatus.SERVICE_UNAVAILABLE,
+            )
+            return
+        now = time.monotonic()
+        last = float(self.server.last_token_issued_at)  # type: ignore[attr-defined]
+        if now - last < VOICE_AGENT_TOKEN_RATE_LIMIT_SECONDS:
+            self._send_json({"error": "voice token rate limit"}, status=HTTPStatus.TOO_MANY_REQUESTS)
+            return
+        token_payload = mint_voice_agent_token(api_key)
+        self.server.last_token_issued_at = now  # type: ignore[attr-defined]
+        self._send_json(token_payload)
 
     def _read_json(self) -> dict[str, Any]:
         raw_length = self.headers.get("Content-Length", "0")
@@ -241,9 +345,12 @@ class VoiceOpsDemoServer(ThreadingHTTPServer):
         server_address: tuple[str, int],
         *,
         gateway_factory: Callable[[], VoiceGateway] | None = None,
+        live_voice_enabled: bool = False,
     ) -> None:
         super().__init__(server_address, VoiceOpsHandler)
         self.store = DemoSessionStore(gateway_factory=gateway_factory)
+        self.live_voice_enabled = live_voice_enabled
+        self.last_token_issued_at = 0.0
 
 
 def main() -> None:
@@ -256,12 +363,21 @@ def main() -> None:
         default="synthetic",
         help="Use offline-safe synthetic reasoning or the existing local AMD .5 runtime.",
     )
+    parser.add_argument(
+        "--enable-live-assemblyai",
+        action="store_true",
+        help="Enable short-lived browser Voice Agent tokens. Requires ASSEMBLYAI_API_KEY server-side.",
+    )
     args = parser.parse_args()
     server = VoiceOpsDemoServer(
         (args.host, args.port),
         gateway_factory=build_gateway_factory(args.reasoner),
+        live_voice_enabled=args.enable_live_assemblyai,
     )
-    print(f"InnerOS VoiceOps demo: http://{args.host}:{args.port} · reasoner={args.reasoner}")
+    print(
+        f"InnerOS VoiceOps demo: http://{args.host}:{args.port} · reasoner={args.reasoner} "
+        f"· live_assemblyai={args.enable_live_assemblyai}"
+    )
     try:
         server.serve_forever()
     except KeyboardInterrupt:
