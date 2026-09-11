@@ -85,9 +85,23 @@ class DemoSessionStore:
             return replay_summary(self._gateway.evidence)
 
     def tool_inspect(self, intent: str) -> dict[str, Any]:
-        state = self.submit_intent(intent)
+        normalized = _normalize_transcript(intent)
+        duplicate = False
+        try:
+            state = self.submit_intent(normalized)
+        except ValueError as exc:
+            if str(exc) != "an approval is already pending":
+                raise
+            with self._lock:
+                latest = self._gateway.evidence.turns[-1].transcript if self._gateway.evidence.turns else None
+                if not self._gateway.pending_approval or latest != normalized or self._gateway.evidence.proposal is None:
+                    raise
+                state = self._snapshot_unlocked()
+                duplicate = True
         return {
-            "status": state.get("last_result", {}).get("status") if isinstance(state.get("last_result"), dict) else None,
+            "status": "already_pending" if duplicate else (
+                state.get("last_result", {}).get("status") if isinstance(state.get("last_result"), dict) else None
+            ),
             "requires_approval": bool(state.get("pending_approval")),
             "guardian": state.get("guardian"),
             "route": state.get("route"),
@@ -97,9 +111,23 @@ class DemoSessionStore:
         }
 
     def tool_approve(self, authorization_phrase: str) -> dict[str, Any]:
-        state = self.approve_pending(authorization_phrase)
+        duplicate = False
+        try:
+            state = self.approve_pending(authorization_phrase)
+        except ValueError as exc:
+            if str(exc) != "no action is awaiting approval":
+                raise
+            with self._lock:
+                approval = self._gateway.evidence.approval
+                action = self._gateway.evidence.action_result
+                if approval is None or not approval.approved or action is None:
+                    raise
+                state = self._snapshot_unlocked()
+                duplicate = True
         return {
-            "status": state.get("last_result", {}).get("status") if isinstance(state.get("last_result"), dict) else None,
+            "status": "already_completed" if duplicate else (
+                state.get("last_result", {}).get("status") if isinstance(state.get("last_result"), dict) else None
+            ),
             "approval": state.get("approval"),
             "action": state.get("action"),
             "htr": state.get("htr"),

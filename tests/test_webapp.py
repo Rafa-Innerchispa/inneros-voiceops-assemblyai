@@ -59,3 +59,29 @@ def test_web_demo_rejects_unbounded_transcript() -> None:
         assert "exceeds" in str(exc)
     else:
         raise AssertionError("oversized transcript must be rejected")
+
+
+def test_tool_inspect_duplicate_same_intent_is_idempotent_while_pending() -> None:
+    store = DemoSessionStore()
+    intent = "Revisa la incidencia del acceso norte"
+    first = store.tool_inspect(intent)
+    second = store.tool_inspect(intent)
+    evidence = store.evidence()
+    proposals = [event for event in evidence["events"] if event["kind"] == "action_proposed"]
+    assert first["requires_approval"] is True
+    assert second["status"] == "already_pending"
+    assert second["requires_approval"] is True
+    assert len(proposals) == 1
+
+
+def test_tool_approve_duplicate_is_idempotent_and_does_not_reexecute() -> None:
+    store = DemoSessionStore()
+    store.tool_inspect("Revisa la incidencia del acceso norte")
+    first = store.tool_approve("Si, autorizo")
+    second = store.tool_approve("Si, autorizo")
+    evidence = store.evidence()
+    executions = [event for event in evidence["events"] if event["kind"] == "action_executed"]
+    assert first["action"]["status"] == "created"
+    assert second["status"] == "already_completed"
+    assert second["action"]["action_id"] == first["action"]["action_id"]
+    assert len(executions) == 1

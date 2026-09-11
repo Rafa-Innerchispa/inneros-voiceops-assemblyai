@@ -61,3 +61,28 @@ def test_http_server_serves_ui_and_governed_api_flow() -> None:
         server.shutdown()
         server.server_close()
         thread.join(timeout=3)
+
+
+def test_browser_voice_agent_uses_progressive_tools_and_spanish_stt_context() -> None:
+    server = VoiceOpsDemoServer(("127.0.0.1", 0), live_voice_enabled=True)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    host, port = server.server_address
+    base = f"http://{host}:{port}"
+    try:
+        with urlopen(base + "/app.js", timeout=3) as response:  # noqa: S310 - local ephemeral test server
+            script = response.read().decode("utf-8")
+        assert 'tools: [inspectTool]' in script
+        assert 'tools: [approveTool]' in script
+        assert 'tools: []' in script
+        assert 'language_codes: ["es"]' in script
+        assert '"sí autorizo"' in script
+        assert '"acceso norte"' in script
+        assert 'execution_mode: "interactive"' in script
+        assert 'handledToolCallIds: new Set()' in script
+        assert 'pendingToolCalls.some((call) => call.call_id === msg.call_id)' in script
+        assert 'handledToolCallIds.add(call.call_id)' in script
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=3)

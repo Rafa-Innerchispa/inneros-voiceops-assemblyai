@@ -164,27 +164,48 @@ els.closeDialog.addEventListener("click", () => els.dialog.close());
 
 const voiceAgent = {
   ws: null, mediaStream: null, audioCtx: null, processor: null, source: null, silentGain: null,
-  ready: false, sessionId: null, lastFinalUserTranscript: "", pendingToolCalls: [], scheduledAudio: [], nextPlaybackTime: 0,
+  ready: false, sessionId: null, lastFinalUserTranscript: "", pendingToolCalls: [], handledToolCallIds: new Set(), scheduledAudio: [], nextPlaybackTime: 0,
   liveTranscriptActive: false
 };
 
-const voiceAgentTools = [
-  {type: "function", name: "inspect_and_propose_action", description: "Inspect the current normalized Physical Guardian incident through InnerOS and request a bounded action proposal. This tool never executes the consequential action.", parameters: {type: "object", properties: {intent: {type: "string", description: "The user's operational intent."}}, required: ["intent"]}},
-  {type: "function", name: "approve_pending_action", description: "Submit the user's explicit authorization phrase to the InnerOS approval gate. Never call for ambiguous, implied, conditional, or agent-generated approval.", parameters: {type: "object", properties: {authorization_phrase: {type: "string", description: "The exact authorization phrase spoken by the user."}}, required: ["authorization_phrase"]}}
-];
+const inspectTool = {
+  type: "function", name: "inspect_and_propose_action", execution_mode: "interactive",
+  description: "Call this whenever the user asks to review, inspect, check, open, create, or act on an operational incident, access point, device, or work order. Do not answer operational requests from memory. This tool only inspects and proposes; it never executes the consequential action.",
+  parameters: {type: "object", properties: {}, required: []}
+};
+const approveTool = {
+  type: "function", name: "approve_pending_action", execution_mode: "interactive",
+  description: "Call this only when an action proposal is already pending AND the user's latest finalized words explicitly authorize it, for example 'sí, autorizo'. Never call it for vague, conditional, implied, or agent-generated approval.",
+  parameters: {type: "object", properties: {}, required: []}
+};
 
 function voiceAgentConfig() {
   return {type: "session.update", session: {
     system_prompt: [
-      "You are the spoken interface for InnerOS VoiceOps. Keep replies short and operational.",
-      "For an operational incident, call inspect_and_propose_action.",
-      "If it reports requires_approval=true, explain the proposal and ask for explicit human authorization.",
-      "Never infer approval from conditional or vague language and never treat your own words as authorization.",
-      "Only after explicit user authorization may you call approve_pending_action.",
-      "After success, state the work order id and that decision evidence was recorded."
+      "Eres la interfaz de voz de InnerOS VoiceOps. Responde en español y de forma breve.",
+      "No inventes ni simules estado operativo. Para cualquier solicitud operativa debes llamar a inspect_and_propose_action.",
+      "Ejemplo: Usuario: 'revisa la incidencia del acceso norte'. Tú: [call inspect_and_propose_action].",
+      "Cuando tengas dudas, llama la herramienta; responder desde memoria es incorrecto."
     ].join(" "),
-    greeting: "InnerOS VoiceOps is ready. Tell me what operational issue you want me to inspect.",
-    output: {voice: "anna", format: {encoding: "audio/pcm"}}, input: {format: {encoding: "audio/pcm"}}, tools: voiceAgentTools
+    greeting: "InnerOS VoiceOps está listo. Dime qué incidencia operativa quieres que revise.",
+    output: {voice: "anna", format: {encoding: "audio/pcm"}},
+    input: {
+      format: {encoding: "audio/pcm"},
+      keyterms: ["InnerOS", "Ralphi", "acceso norte", "orden técnica", "sí autorizo", "sí apruebo"],
+      language_codes: ["es"]
+    },
+    tools: [inspectTool]
+  }};
+}
+
+function phaseUpdate(phase) {
+  if (phase === "approval") return {type: "session.update", session: {
+    system_prompt: "Hay una propuesta pendiente. Explica brevemente el resultado de la herramienta y pide autorización humana explícita. No ejecutes nada todavía. Si la última respuesta del usuario autoriza explícitamente, por ejemplo 'sí, autorizo', llama a approve_pending_action. Ejemplo: Usuario: 'sí, autorizo'. Tú: [call approve_pending_action].",
+    tools: [approveTool]
+  }};
+  return {type: "session.update", session: {
+    system_prompt: "La operación gobernada ya terminó. Usa únicamente el resultado de la herramienta para confirmar el estado, el identificador de la orden si existe y que se registró Decision Evidence. No llames más herramientas.",
+    tools: []
   }};
 }
 
@@ -232,7 +253,13 @@ async function flushToolCalls() {
   const calls = voiceAgent.pendingToolCalls.splice(0);
   for (const call of calls) {
     let result; try { result = await executeVoiceTool(call); await refresh(); } catch (err) { result = {error: err.message}; }
+    if (call.name === "inspect_and_propose_action" && !result.error) {
+      voiceAgent.ws.send(JSON.stringify(phaseUpdate(result.requires_approval ? "approval" : "complete")));
+    } else if (call.name === "approve_pending_action") {
+      voiceAgent.ws.send(JSON.stringify(phaseUpdate("complete")));
+    }
     voiceAgent.ws.send(JSON.stringify({type: "tool.result", call_id: call.call_id, result: JSON.stringify(result)}));
+    voiceAgent.handledToolCallIds.add(call.call_id);
   }
 }
 
@@ -246,7 +273,13 @@ async function handleVoiceAgentMessage(event) {
   else if (msg.type === "transcript.user") { voiceAgent.lastFinalUserTranscript = msg.text || ""; els.transcript.textContent = voiceAgent.lastFinalUserTranscript || "No transcript yet."; setState(els.voiceState, "FINAL TRANSCRIPT", "ready"); }
   else if (msg.type === "reply.audio" && msg.data) playVoiceAgentAudio(msg.data);
   else if (msg.type === "transcript.agent") els.agentTranscript.textContent = msg.text || "";
-  else if (msg.type === "tool.call") { voiceAgent.pendingToolCalls.push({call_id: msg.call_id, name: msg.name}); setLiveStatus(`TOOL REQUEST · ${msg.name}`, "active"); }
+  else if (msg.type === "tool.call") {
+    const duplicate = voiceAgent.handledToolCallIds.has(msg.call_id) || voiceAgent.pendingToolCalls.some((call) => call.call_id === msg.call_id);
+    if (!duplicate) {
+      voiceAgent.pendingToolCalls.push({call_id: msg.call_id, name: msg.name});
+      setLiveStatus(`TOOL REQUEST · ${msg.name}`, "active");
+    }
+  }
   else if (msg.type === "reply.done") {
     if (msg.status === "interrupted") { voiceAgent.pendingToolCalls = []; flushVoicePlayback(); setLiveStatus("INTERRUPTED · pending tools discarded", "warning"); }
     else { await flushToolCalls(); if (voiceAgent.ready) setLiveStatus(`LIVE · ${voiceAgent.sessionId}`, "ready"); }
@@ -278,7 +311,7 @@ async function startVoiceAgent() {
 }
 
 function cleanupVoiceAgent(closeSocket = true) {
-  voiceAgent.ready = false; voiceAgent.liveTranscriptActive = false; voiceAgent.pendingToolCalls = []; flushVoicePlayback();
+  voiceAgent.ready = false; voiceAgent.liveTranscriptActive = false; voiceAgent.pendingToolCalls = []; voiceAgent.handledToolCallIds.clear(); flushVoicePlayback();
   if (voiceAgent.processor) { voiceAgent.processor.disconnect(); voiceAgent.processor.onaudioprocess = null; }
   if (voiceAgent.source) voiceAgent.source.disconnect(); if (voiceAgent.silentGain) voiceAgent.silentGain.disconnect();
   if (voiceAgent.mediaStream) voiceAgent.mediaStream.getTracks().forEach((track) => track.stop()); if (voiceAgent.audioCtx) voiceAgent.audioCtx.close().catch(() => {});
