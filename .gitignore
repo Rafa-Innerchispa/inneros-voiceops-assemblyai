@@ -21,3 +21,4 @@ htmlcov/
 secrets/
 recordings/private/
 evidence/private/
+runtime/
