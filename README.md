@@ -1,80 +1,29 @@
 # InnerOS VoiceOps — AssemblyAI Voice Agent Hackathon 2026
 
-> **Speak an intent. InnerOS safely turns it into real-world execution, and proves exactly what happened.**
+> **Speak an intent. InnerOS turns it into governed execution and proves what happened.**
 
-InnerOS VoiceOps is a governed voice control plane for real-world service operations, buildings, security systems, field workflows, and enterprise tools. It uses AssemblyAI for real-time speech understanding, InnerOS for orchestration and policy, local-first reasoning on our AMD infrastructure, MCP tools for execution, and Audit Fabric / Forensic Replay for evidence.
+InnerOS VoiceOps is a local-first voice control plane for service operations and physical-world workflows. AssemblyAI provides realtime speech understanding; InnerOS provides context, routing, policy, approval, execution, and evidence.
 
-This repository is the canonical hackathon workspace for the **AssemblyAI Voice Agent Hackathon 2026** on lablab.ai.
+This is the canonical hackathon repository for the **AssemblyAI Voice Agent Hackathon 2026** on lablab.ai.
 
 ## Hackathon facts
 
-- Event: AssemblyAI — Voice Agent Hackathon
 - Organizer: lablab.ai + AssemblyAI
-- Format: fully online, month-long challenge
+- Format: fully online
 - Build window: **September 1–30, 2026**
+- Prize pool: **USD 10,000** ($5,000 cash + $5,000 AssemblyAI credits)
 - Registration: open throughout the build window
-- Prize pool: **USD 10,000** total, split between cash and AssemblyAI credits
 - Event: https://lablab.ai/ai-hackathons/assemblyai-voice-agent-hackathon
-- Repo owner: Rafa-Innerchispa
-- Project status: ACTIVE / BUILDING
+- Participation/application: **approved**
+- Repository: `Rafa-Innerchispa/inneros-voiceops-assemblyai`
 
-## Why we are building this
+## Product thesis
 
-We are not building another generic voice chatbot. VoiceOps is a voice interface for governed execution.
+We are not building another generic voice chatbot.
 
-The demo should prove this chain:
+**Voice is the interface. Governed execution is the product.**
 
-1. A human speaks an operational intent.
-2. AssemblyAI transcribes it in real time.
-3. InnerOS resolves context, policy, tenant, tools, and routing.
-4. A local model is preferred whenever capability and policy allow it.
-5. MCP tools execute a real or synthetic operational workflow.
-6. Human approval is required for governed actions when policy says so.
-7. Audit Fabric records decision evidence, routing evidence, actions, outputs, and timestamps.
-8. Human Time Returned (HTR) quantifies how much manual work was reduced.
-9. Forensic Replay can reconstruct what the agent saw and did without rewriting history.
-10. The user receives a spoken result.
-
-## Core demo story
-
-A recommended synthetic demo scenario is a technical-service/building operation:
-
-> “Ralphi, tenemos una alarma en el acceso norte. Revisa qué ocurre y abre una orden para el técnico si corresponde.”
-
-Expected flow:
-
-- realtime transcription;
-- operational context lookup;
-- safe reasoning and tool routing;
-- alarm/camera/access state inspection using synthetic or demo-safe data;
-- explicit approval gate before consequential action;
-- work order creation;
-- technician assignment / follow-up;
-- evidence bundle generation;
-- HTR calculation;
-- spoken completion summary.
-
-The demo must never require production credentials, customer PII, or destructive actions.
-
-## Product positioning
-
-**InnerOS VoiceOps: The Governed Voice Control Plane for the Physical World**
-
-Voice is the interface, not the product. The product is the execution layer behind it.
-
-Differentiators:
-
-- local-first model routing;
-- real tool execution through MCP;
-- human approval gates;
-- physical-world / service-operations workflows;
-- decision and routing evidence;
-- forensic replay;
-- Human Time Returned metrics;
-- tenant-aware policy and authorization;
-- AssemblyAI used as a first-class realtime speech layer, not merely a logo in the stack.
-
-## Architecture
+The demo proves this chain:
 
 ```text
 Human voice
@@ -85,168 +34,289 @@ AssemblyAI realtime STT
     v
 InnerOS Voice Gateway
     |
-    +--> Context / tenant / policy
+    +--> context / policy / tenant
     +--> Resource Fabric routing
     |      |
-    |      +--> Local AMD inference (preferred)
-    |      +--> External fallback only when required
+    |      +--> local AMD inference preferred
+    |      +--> external fallback only when required
     |
     v
-MCP capability layer
-    |
-    +--> Service Operations
-    +--> VigilOS / building-security demo adapters
-    +--> Quote / visit / work-order flows
-    +--> Workforce adapter (optional)
-    +--> Email / messaging / other approved integrations
+Governed capability / MCP boundary
     |
     v
-Approval gates + action execution
+Explicit approval gate
     |
     v
-Audit Fabric / Forensic Replay / HTR
+Action execution
     |
     v
-TTS response
+Audit evidence + replay + HTR
+    |
+    v
+Human-readable completion result
 ```
 
-See `docs/ARCHITECTURE.md` for the detailed boundaries and implementation contract.
+## Demo story
+
+Primary demo scenario:
+
+> “Ralphi, tenemos una alarma en el acceso norte. Revisa qué ocurre y abre una orden para el técnico si corresponde.”
+
+VoiceOps should:
+
+1. transcribe the request with AssemblyAI realtime speech;
+2. receive normalized operational context from the appropriate InnerOS domain boundary;
+3. route reasoning local-first;
+4. propose a bounded action;
+5. require explicit verbal approval before the consequential step;
+6. create a **synthetic/demo work order**;
+7. expose routing, decision, approval, action, replay, and HTR evidence;
+8. report completion.
+
+The public demo must never require customer PII, production credentials, or destructive actions.
+
+## Verified state — September 10, 2026
+
+| Capability | State | Truth boundary |
+| --- | --- | --- |
+| Voice Gateway session/correlation/turn state | ✅ Implemented | Tested locally |
+| Explicit approval semantics | ✅ Implemented | Ambiguous/negated approval fails closed |
+| Synthetic service workflow | ✅ Implemented | No production work-order writes |
+| Audit evidence | ✅ Implemented | Synthetic/demo-safe evidence |
+| Captured-state replay | ✅ Implemented | Replays captured evidence, not current state |
+| HTR | ✅ Implemented | `MEASURED` vs `ESTIMATED` retained |
+| AssemblyAI v3 realtime adapter | ✅ Implemented | Lifecycle/turn/context behavior tested |
+| PCM16 mono 16 kHz audio contract | ✅ Implemented | WAV validation + microphone source support |
+| Judge-facing one-screen UI | ✅ Implemented | Synthetic mode clearly labeled |
+| Resource Fabric local-first route | ✅ Verified | `local-amd-5` selected |
+| AMD .5 live bounded inference | ✅ Verified separately | Qwen on local vLLM; external fallback false |
+| Automated tests | ✅ **35/35 PASS** | Current E2E branch, 2026-09-10 |
+| `compileall` | ✅ PASS | `src` + `tests`, 2026-09-10 |
+| `git diff --check` | ✅ PASS | 2026-09-10 |
+| Live AssemblyAI provider session | ⏳ Pending | Requires server-side API key injection |
+| Controlled WAV live E2E | ⏳ Pending | Do not claim until captured |
+| Microphone live E2E | ⏳ Pending | Do not claim until captured |
+| Public judge URL | ⏳ Pending | Deployment step |
+| Pitch deck / demo video / final submission | ⏳ Pending | Packaging step |
+
+### Important live truth boundary
+
+The repository does **not** yet claim a complete live microphone → AssemblyAI → AMD .5 → approval → action run.
+
+That claim becomes valid only after a real AssemblyAI v3 session is executed with a server-side `ASSEMBLYAI_API_KEY` and sanitized evidence captures the provider session, termination, transcript, route, approval/action result, and latencies from the same run.
+
+No API key may be committed, printed, copied into screenshots, or stored in public evidence.
 
 ## Local-first rule
 
-This project follows the InnerOS local-first development policy:
+This project follows the InnerOS local-first policy:
 
-- prefer direct execution on local infrastructure;
-- prefer local AMD inference when capability allows;
-- use external model/agent providers only for unsupported capability, recovery, or a verified blocker;
-- no unnecessary cloud spend;
-- no production writes during hackathon development unless explicitly approved;
-- never weaken auth, tenant isolation, auditability, or approval gates just to make the demo easier.
+- execute directly on local infrastructure whenever practical;
+- prefer local AMD inference when capability and policy allow it;
+- use external models/agents only for unsupported capability or a verified blocker;
+- avoid unnecessary cloud spend;
+- never weaken authorization, approval, tenant isolation, or evidence to make a demo easier.
 
-## What we reuse vs. what is new
+## AssemblyAI integration
 
-### Reused / integrated InnerOS capabilities
+The hackathon adapter uses AssemblyAI as a first-class realtime speech layer:
 
-- MCP control plane and tool routing;
-- Resource Fabric / local-first routing;
-- AMD local inference infrastructure;
-- Service Operations workflow work;
+- v3 realtime streaming contract;
+- partial vs final turn handling;
+- explicit connection lifecycle;
+- controlled final-turn routing into VoiceOps;
+- `agent_context` refresh after InnerOS replies;
+- explicit `disconnect(terminate=True)` shutdown;
+- secret-safe preflight behavior;
+- PCM16 mono 16 kHz validation;
+- bounded evidence that excludes the API key.
+
+See `docs/LIVE_RUNBOOK.md`.
+
+## InnerOS boundaries
+
+VoiceOps does not duplicate the rest of InnerOS.
+
+### Reused / integrated capabilities
+
+- Resource Fabric and local-first routing;
+- AMD .5 inference infrastructure;
+- MCP/capability boundaries;
+- service-operations concepts;
 - Audit Fabric contracts;
-- Forensic Replay / Evidence Bundles;
+- Forensic Replay / evidence bundles;
 - Human Time Returned instrumentation;
-- correlation IDs / decision evidence / routing evidence;
+- correlation and routing evidence;
 - approval and tenant-safety concepts.
 
-### Hackathon-specific work
+### New hackathon work
 
-- AssemblyAI realtime streaming adapter;
-- Voice Gateway session/orchestration layer;
-- dynamic speech context integration where useful;
-- interruption / turn handling;
-- voice-safe approval UX;
-- end-to-end voice demo flow;
-- hackathon demo tenant and synthetic fixtures;
-- public deployment/demo package;
-- hackathon pitch, video, submission copy, and evidence.
+- AssemblyAI realtime adapter;
+- voice session / turn state;
+- voice approval UX;
+- audio sources and validation;
+- live demo harness;
+- judge-facing web UI;
+- synthetic VoiceOps workflow;
+- hackathon evidence/runbooks.
 
-We must explicitly document which changes were made during the hackathon period. Do not claim pre-existing InnerOS components were built from scratch for this event.
+Existing InnerOS capabilities are described as **reused/integrated**, not falsely claimed as hackathon-built work.
 
-## Repository structure
+## Cross-repo boundary
 
-```text
-src/                    Product code
-  voiceops/             VoiceOps application package
-  adapters/             AssemblyAI and InnerOS adapters
-  workflows/            Demo-safe governed workflows
-  audit/                Hackathon-side audit integration hooks
+Physical Guardian owns perception and normalized physical incidents/action candidates.
 
-tests/                  Unit / integration / E2E tests
-fixtures/               Synthetic demo data only
-docs/
-  ARCHITECTURE.md        Technical architecture and boundaries
-  PROJECT_CANONICAL.md   Project truth / product decisions
-  ROADMAP.md             Build plan and milestone dates
-  HACKATHON_CHECKLIST.md Submission and judging checklist
-  DEMO_SCRIPT.md         Canonical demo story
-  SUBMISSION_NOTES.md    Facts and claims safe to use publicly
+VoiceOps owns speech, turn handling, approval semantics, voice-to-capability routing, and presentation of execution evidence.
 
-evidence/               Generated non-secret benchmark/demo evidence
+Service Operations owns the real work-order lifecycle.
+
+The hackathon demo binds these boundaries through safe/synthetic adapters rather than copying domain logic into this repository.
+
+## Quick start
+
+Requirements:
+
+- Python 3.11+
+
+Install development dependencies:
+
+```bash
+python3 -m pip install -e '.[dev]'
 ```
 
-## Definition of Done
+Run tests:
 
-A valid hackathon-ready release requires all of the following:
+```bash
+python3 -m pytest tests -q
+python3 -m compileall -q src tests
+git diff --check
+```
 
-- [ ] AssemblyAI realtime speech input works end-to-end.
-- [ ] At least one complete governed operational workflow executes.
-- [ ] Local-first inference path is demonstrated or measured.
-- [ ] Consequential action has an explicit approval gate.
-- [ ] Decision Evidence and Routing Evidence are visible.
-- [ ] Human Time Returned is calculated with a clear MEASURED vs ESTIMATED boundary.
-- [ ] Replay/evidence bundle can be inspected for the demo workflow.
-- [ ] Synthetic tenant data only in public demo artifacts.
-- [ ] Automated tests pass.
-- [ ] Public demo URL works for judges.
-- [ ] README is current.
-- [ ] Architecture diagram is current.
-- [ ] Pitch deck is complete.
-- [ ] Demo video is recorded before deadline day.
-- [ ] Submission form is drafted before deadline day.
-- [ ] Final repo is public and contains an open-source license.
-- [ ] No secrets are committed.
+Run the deterministic local demo:
 
-## Judging strategy
+```bash
+voiceops-demo
+```
 
-We optimize for four things:
+Run the judge-facing web UI:
 
-1. **Technology use** — AssemblyAI is central to the real-time interaction, not decorative.
-2. **Originality** — governed voice execution over physical/service operations rather than a generic assistant.
-3. **Business value** — Human Time Returned and operational outcomes are measured.
-4. **Presentation** — one short voice interaction visibly drives a complete auditable workflow.
+```bash
+voiceops-web
+```
 
-## Current priorities
+The offline UI defaults to deterministic/synthetic reasoning and must remain visibly labeled as such.
 
-1. Bootstrap the AssemblyAI streaming adapter.
-2. Create the Voice Gateway contract.
-3. Bind one synthetic Service Operations / VigilOS workflow.
-4. Bind audit + HTR evidence.
-5. Run a local E2E demo on AMD .5.
-6. Add a minimal judge-facing UI.
-7. Deploy a public demo safely.
-8. Record video and submit early.
+## Live AssemblyAI run
 
-## Non-goals
+Install the AssemblyAI integration:
 
-- Rebuild InnerOS inside this repository.
-- Duplicate Workforce, Service Operations, QuoteOps, VigilOS, or Forensic Replay business logic.
-- Make production building controls available publicly.
-- Depend on Notion as the only source of truth.
-- Use customer data in the demo.
-- Claim deterministic LLM re-generation where it cannot be guaranteed.
-- Optimize for architectural novelty at the expense of a working demo.
+```bash
+python3 -m pip install -e '.[assemblyai]'
+```
 
-## Security and truth boundaries
+Microphone support:
 
-- Never commit API keys, OAuth tokens, production URLs containing secrets, customer identifiers, or raw private recordings.
-- Use `.env.example` for configuration names only.
-- Public evidence must contain synthetic or explicitly sanitized data.
-- `MEASURED` metrics must be backed by captured evidence.
-- `ESTIMATED` metrics must stay visibly labeled as estimates.
-- A replay must not silently fetch current data and pretend it is historical state.
-- Existing InnerOS capability must be described as existing/reused, not falsely attributed to this hackathon.
+```bash
+python3 -m pip install -e '.[microphone]'
+```
 
-## Canonical docs
+Provide the key through a secure runtime environment, **never through Git**:
 
-Start here when resuming work:
+```text
+ASSEMBLYAI_API_KEY=<server-side secret>
+```
+
+Preflight:
+
+```bash
+voiceops-live --preflight
+```
+
+Controlled PCM16 mono 16 kHz WAV:
+
+```bash
+voiceops-live --wav path/to/demo.wav --evidence evidence/live_wav_e2e.json
+```
+
+Microphone:
+
+```bash
+voiceops-live --microphone --evidence evidence/live_microphone_e2e.json
+```
+
+See `docs/LIVE_RUNBOOK.md` before any live provider run.
+
+## Evidence
+
+Current evidence includes:
+
+- AMD .5 local reasoning proof;
+- Resource Fabric local route proof;
+- live-audio implementation checkpoint;
+- integration-boundary review;
+- judge UI checkpoint;
+- deterministic tests for approval, audit, gateway E2E, AssemblyAI adapter, AMD adapter, audio, web UI, and HTTP flow.
+
+Evidence is intentionally truth-sensitive. A component being implemented does not automatically mean an external provider session has been executed.
+
+## Repository map
+
+```text
+src/voiceops/              VoiceOps application
+  adapters/                AssemblyAI + local AMD boundaries
+  web/                     Judge-facing static UI
+  gateway.py               Session/turn orchestration
+  approval.py              Explicit approval semantics
+  audit.py                 Evidence integration
+  audio.py                 WAV/microphone sources
+  live_demo.py             Live AssemblyAI harness
+  webapp.py                Judge demo server
+  workflows.py             Synthetic governed workflow
+
+tests/                     Automated verification
+docs/                      Architecture, runbooks, demo/submission docs
+evidence/                  Sanitized checkpoints and measured evidence
+```
+
+## Security and truth policy
+
+- Never commit API keys, tokens, credential-bearing URLs, customer identifiers, or private recordings.
+- Public evidence uses synthetic or explicitly sanitized data.
+- `MEASURED` means backed by captured measurements.
+- `ESTIMATED` stays labeled as an estimate.
+- Replay never silently fetches current state and presents it as historical state.
+- Public demo actions remain synthetic unless a separate production authorization model is introduced outside the hackathon surface.
+
+## Definition of done
+
+The technical core is substantially implemented. Final submission still requires:
+
+- [ ] one real AssemblyAI controlled-WAV E2E run;
+- [ ] one real microphone E2E run;
+- [ ] same-run latency and provider-session evidence;
+- [ ] clean-clone verification;
+- [ ] final release/merge SHA;
+- [ ] public judge-safe URL;
+- [ ] cover / architecture media;
+- [ ] pitch deck;
+- [ ] demo video;
+- [ ] submission copy and final lablab.ai submission.
+
+The canonical detailed checklist is `docs/HACKATHON_CHECKLIST.md`.
+
+## Canonical resume order
+
+When resuming development, read:
 
 1. `README.md`
 2. `docs/PROJECT_CANONICAL.md`
-3. `docs/ROADMAP.md`
-4. `docs/HACKATHON_CHECKLIST.md`
+3. `docs/HACKATHON_CHECKLIST.md`
+4. `docs/LIVE_RUNBOOK.md`
 5. `docs/ARCHITECTURE.md`
 6. `docs/DEMO_SCRIPT.md`
+7. latest files under `evidence/`
 
-If implementation and documentation disagree, update the documentation in the same PR/commit that changes the behavior.
+Then continue from the first incomplete P0 item instead of redesigning the project from memory.
 
 ## License
 
