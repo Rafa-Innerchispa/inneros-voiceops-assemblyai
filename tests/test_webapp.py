@@ -85,3 +85,57 @@ def test_tool_approve_duplicate_is_idempotent_and_does_not_reexecute() -> None:
     assert second["status"] == "already_completed"
     assert second["action"]["action_id"] == first["action"]["action_id"]
     assert len(executions) == 1
+
+
+def _real_guardian_event(event_id: str = "evt_real_001") -> dict[str, object]:
+    return {
+        "event_id": event_id,
+        "source_id": "camera-2",
+        "event_type": "zone.person.prolonged",
+        "severity": "high",
+        "occurred_at": "2026-09-11T12:00:00+00:00",
+        "tenant_id": "tenant-demo",
+        "site_id": "site-demo",
+        "zone_id": "Puerta",
+        "confidence": 0.93,
+        "evidence_refs": [f"evidence://guardian/{event_id}"],
+    }
+
+
+def test_guardian_whatsapp_voice_bridge_binds_exact_event_and_requires_two_step_approval() -> None:
+    store = DemoSessionStore()
+    event = _real_guardian_event()
+    proposed = store.submit_guardian_voice_command(event, "Revisa y abre una orden si corresponde")
+    assert proposed["bridge_surface"] == "whatsapp_voice"
+    assert proposed["bridge_event_id"] == "evt_real_001"
+    assert proposed["pending_approval"] is True
+    assert proposed["guardian"]["source"] == "physical_guardian_normalized_event"
+    blocked = store.submit_guardian_voice_command(event, "Si crees que hace falta")
+    assert blocked["last_result"]["status"] == "blocked"
+    approved = store.submit_guardian_voice_command(event, "Sí, autorizo")
+    assert approved["last_result"]["status"] == "completed"
+    assert approved["action"]["details"]["source_event_id"] == "evt_real_001"
+    assert approved["last_result"]["permit_single_use"] is True
+
+
+def test_guardian_whatsapp_voice_bridge_rejects_event_switch_while_approval_pending() -> None:
+    store = DemoSessionStore()
+    store.submit_guardian_voice_command(_real_guardian_event("evt_a"), "Revisa esta incidencia")
+    try:
+        store.submit_guardian_voice_command(_real_guardian_event("evt_b"), "Sí, autorizo")
+    except ValueError as exc:
+        assert "another Guardian event" in str(exc)
+    else:
+        raise AssertionError("approval must stay bound to the original Guardian event")
+
+
+def test_guardian_whatsapp_voice_bridge_duplicate_after_completion_is_idempotent() -> None:
+    store = DemoSessionStore()
+    event = _real_guardian_event()
+    store.submit_guardian_voice_command(event, "Revisa esta incidencia")
+    completed = store.submit_guardian_voice_command(event, "Sí, autorizo")
+    duplicate = store.submit_guardian_voice_command(event, "Sí, autorizo")
+    executions = [e for e in store.evidence()["events"] if e["kind"] == "action_executed"]
+    assert duplicate["bridge_status"] == "already_completed"
+    assert duplicate["action"]["action_id"] == completed["action"]["action_id"]
+    assert len(executions) == 1

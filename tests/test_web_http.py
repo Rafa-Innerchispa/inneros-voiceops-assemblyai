@@ -86,3 +86,64 @@ def test_browser_voice_agent_uses_progressive_tools_and_spanish_stt_context() ->
         server.shutdown()
         server.server_close()
         thread.join(timeout=3)
+
+
+def test_guardian_voice_http_bridge_requires_token_and_binds_event() -> None:
+    from urllib.error import HTTPError
+
+    server = VoiceOpsDemoServer(("127.0.0.1", 0), bridge_token="fixture-bridge-key")
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    host, port = server.server_address
+    base = f"http://{host}:{port}"
+    event = {
+        "event_id": "evt_http_001",
+        "source_id": "camera-2",
+        "event_type": "zone.person.prolonged",
+        "severity": "high",
+        "occurred_at": "2026-09-11T12:00:00+00:00",
+        "tenant_id": "tenant-demo",
+        "site_id": "site-demo",
+        "zone_id": "Puerta",
+        "confidence": 0.91,
+    }
+    try:
+        health = _get_json(base + "/healthz")
+        assert health["guardian_voice_bridge_enabled"] is True
+        payload = {"event": event, "transcript": "Revisa esta incidencia"}
+        unauthorized = Request(
+            base + "/api/guardian/voice-command",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            urlopen(unauthorized, timeout=3)  # noqa: S310 - local ephemeral test server
+        except HTTPError as exc:
+            assert exc.code == 401
+        else:
+            raise AssertionError("bridge must reject requests without authorization")
+
+        def bridge_post(transcript: str) -> dict[str, object]:
+            request = Request(
+                base + "/api/guardian/voice-command",
+                data=json.dumps({"event": event, "transcript": transcript}).encode("utf-8"),
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": "Bearer fixture-bridge-key",
+                },
+                method="POST",
+            )
+            with urlopen(request, timeout=3) as response:  # noqa: S310 - local ephemeral test server
+                return json.loads(response.read().decode("utf-8"))
+
+        proposed = bridge_post("Revisa esta incidencia")
+        assert proposed["bridge_event_id"] == "evt_http_001"
+        assert proposed["pending_approval"] is True
+        completed = bridge_post("Sí, autorizo")
+        assert completed["action"]["details"]["source_event_id"] == "evt_http_001"  # type: ignore[index]
+        assert completed["last_result"]["permit_single_use"] is True  # type: ignore[index]
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=3)

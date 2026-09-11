@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import hmac
 import json
 import os
 import threading
@@ -83,6 +84,35 @@ class DemoSessionStore:
     def replay(self) -> dict[str, Any]:
         with self._lock:
             return replay_summary(self._gateway.evidence)
+
+    def submit_guardian_voice_command(self, event: dict[str, Any], transcript: str) -> dict[str, Any]:
+        """Process an authenticated WhatsApp/voice command bound to one Guardian event."""
+        normalized = _normalize_transcript(transcript)
+        event_id = str(event.get("event_id") or "").strip()
+        if not event_id:
+            raise ValueError("Guardian event_id is required")
+        with self._lock:
+            current = self._gateway.workflow.inspect()
+            current_event_id = str(current.get("event_id") or "")
+            action = self._gateway.evidence.action_result
+            if action is not None:
+                action_event_id = str(action.details.get("source_event_id") or "")
+                if action_event_id == event_id:
+                    state = self._snapshot_unlocked()
+                    state["bridge_status"] = "already_completed"
+                    return state
+                raise ValueError("session already completed for another Guardian event")
+            if self._gateway.pending_approval:
+                if current_event_id != event_id:
+                    raise ValueError("approval is pending for another Guardian event")
+            elif current_event_id != event_id or current.get("production_event") is not True:
+                self._gateway.bind_guardian_event(event)
+            self._last_result = self._gateway.process_final_transcript(normalized)
+            state = self._snapshot_unlocked()
+            state["bridge_status"] = str(self._last_result.get("status") or "processed")
+            state["bridge_surface"] = "whatsapp_voice"
+            state["bridge_event_id"] = event_id
+            return state
 
     def tool_inspect(self, intent: str) -> dict[str, Any]:
         normalized = _normalize_transcript(intent)
@@ -268,6 +298,7 @@ class VoiceOpsHandler(BaseHTTPRequestHandler):
                     "service": "inneros-voiceops",
                     "live_voice_enabled": bool(self.server.live_voice_enabled),  # type: ignore[attr-defined]
                     "credential_configured": bool(os.getenv("ASSEMBLYAI_API_KEY")),
+                    "guardian_voice_bridge_enabled": bool(self.server.bridge_token),  # type: ignore[attr-defined]
                     "production_writes": False,
                 }
             )
@@ -329,6 +360,21 @@ class VoiceOpsHandler(BaseHTTPRequestHandler):
                 payload = self._read_json()
                 self._send_json(self.store.tool_approve(str(payload.get("authorization_phrase") or "")))
                 return
+            if self.path == "/api/guardian/voice-command":
+                if not self._bridge_authorized():
+                    self._send_json({"error": "guardian voice bridge unauthorized"}, status=HTTPStatus.UNAUTHORIZED)
+                    return
+                payload = self._read_json()
+                event = payload.get("event")
+                if not isinstance(event, dict):
+                    raise ValueError("event must be a Guardian NormalizedEvent object")
+                self._send_json(
+                    self.store.submit_guardian_voice_command(
+                        event,
+                        str(payload.get("transcript") or ""),
+                    )
+                )
+                return
             self.send_error(HTTPStatus.NOT_FOUND)
         except (ValueError, json.JSONDecodeError) as exc:
             self._send_json({"error": str(exc)}, status=HTTPStatus.BAD_REQUEST)
@@ -337,6 +383,14 @@ class VoiceOpsHandler(BaseHTTPRequestHandler):
                 {"error": f"provider unavailable: {type(exc).__name__}"},
                 status=HTTPStatus.BAD_GATEWAY,
             )
+
+    def _bridge_authorized(self) -> bool:
+        expected = str(self.server.bridge_token or "")  # type: ignore[attr-defined]
+        if not expected:
+            return False
+        raw = self.headers.get("Authorization", "")
+        prefix = "Bearer "
+        return raw.startswith(prefix) and hmac.compare_digest(raw[len(prefix):].strip(), expected)
 
     def _handle_voice_agent_token(self) -> None:
         if not bool(self.server.live_voice_enabled):  # type: ignore[attr-defined]
@@ -392,10 +446,12 @@ class VoiceOpsDemoServer(ThreadingHTTPServer):
         *,
         gateway_factory: Callable[[], VoiceGateway] | None = None,
         live_voice_enabled: bool = False,
+        bridge_token: str = "",
     ) -> None:
         super().__init__(server_address, VoiceOpsHandler)
         self.store = DemoSessionStore(gateway_factory=gateway_factory)
         self.live_voice_enabled = live_voice_enabled
+        self.bridge_token = bridge_token
         self.last_token_issued_at = 0.0
 
 
@@ -424,6 +480,7 @@ def main() -> None:
         (args.host, args.port),
         gateway_factory=build_gateway_factory(args.reasoner),
         live_voice_enabled=args.enable_live_assemblyai,
+        bridge_token=os.getenv("VOICEOPS_BRIDGE_TOKEN", ""),
     )
     print(
         f"InnerOS VoiceOps demo: http://{args.host}:{args.port} · reasoner={args.reasoner} "
