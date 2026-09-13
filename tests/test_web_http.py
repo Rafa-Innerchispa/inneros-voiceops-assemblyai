@@ -147,3 +147,42 @@ def test_guardian_voice_http_bridge_requires_token_and_binds_event() -> None:
         server.shutdown()
         server.server_close()
         thread.join(timeout=3)
+
+
+def test_guardian_voice_http_bridge_allows_loopback_without_shared_token() -> None:
+    server = VoiceOpsDemoServer(("127.0.0.1", 0))
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    host, port = server.server_address
+    base = f"http://{host}:{port}"
+    event = {
+        "event_id": "evt_loopback_001",
+        "source_id": "camera-2",
+        "event_type": "zone.person.dwell",
+        "severity": "high",
+        "occurred_at": "2026-09-11T12:30:00+00:00",
+        "tenant_id": "tenant-demo",
+        "site_id": "site-demo",
+        "zone_id": "Puerta",
+        "confidence": 0.9,
+    }
+    try:
+        health = _get_json(base + "/healthz")
+        assert health["guardian_voice_bridge_enabled"] is True
+        assert health["guardian_voice_bridge_mode"] == "loopback_only"
+        proposed = _post_json(
+            base + "/api/guardian/voice-command",
+            {"event": event, "transcript": "Revisa esta incidencia"},
+        )
+        assert proposed["bridge_event_id"] == "evt_loopback_001"
+        assert proposed["pending_approval"] is True
+        completed = _post_json(
+            base + "/api/guardian/voice-command",
+            {"event": event, "transcript": "Sí, autorizo"},
+        )
+        assert completed["action"]["details"]["source_event_id"] == "evt_loopback_001"  # type: ignore[index]
+        assert completed["last_result"]["permit_single_use"] is True  # type: ignore[index]
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=3)
