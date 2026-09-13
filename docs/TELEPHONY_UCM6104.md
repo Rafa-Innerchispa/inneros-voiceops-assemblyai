@@ -1,0 +1,107 @@
+# InnerOS Telephony Adapter — Grandstream UCM6104
+
+Status date: 2026-09-13
+
+## Scope
+
+This integration connects VoiceOps/Ralphi to the legacy Grandstream UCM6104 through bounded local interfaces. The initial production surface is intentionally read-only. Call origination and other consequential telephony actions remain disabled until a dedicated service identity, routing policy, approval policy, and Voice Execution Permit binding are in place.
+
+## Live verified device state
+
+- Device: Grandstream UCM6104
+- LAN address: `192.168.1.6`
+- MAC: `00:0B:82:86:33:AB`
+- UniFi device state: connected/wired
+- HTTP 80: open, redirects to `https://192.168.1.6:8089/`
+- HTTPS 8089: open, TLS 1.2, `lighttpd/1.4.47`
+- HTTP 8088: open, root returns 404 with `Asterisk/13.4.0` server header
+- TCP 389: open
+- TCP 7777: open and verified as Asterisk Manager Interface
+- AMI banner: `Asterisk Call Manager/2.7.0`
+- AMI `Challenge` with `AuthType: MD5`: supported
+- Unauthenticated AMI `Ping`: denied, as expected
+- TCP 22/443/5038/5039/5060/5061/9090/25000/25001: closed from the LAN probes
+- UDP OPTIONS/read-only probes to 4569/5060/5061/9090/25000/25001: no response from either InnerOS `.4` or AMD `.5`
+
+No PBX configuration was changed while collecting this evidence.
+
+## Historical configuration versus live truth
+
+Historical notes confirm extension `1000`, Auth ID `PCD0ct0r1000`, and SIP port `25000` existed in the old documentation. Those values are not yet an authoritative read of the current PBX configuration.
+
+The historical house number and the currently supplied house number differ. VoiceOps must not infer the active DID/trunk from either value. The current trunk and inbound/outbound route inventory remain unverified until an authenticated read-only PBX session is available.
+
+`25000` must therefore be treated as historical/unverified. It does not currently answer on the PBX LAN address over TCP or UDP from two independent LAN sources. It may have been an old bind, an external/NAT-facing port, or a retired setting. UPnP/IGD discovery from the InnerOS host returned no gateway mapping inventory, so no NAT claim is made from that probe.
+
+## Why AMI is now the preferred control path
+
+The UCM6104 exposes AMI on TCP 7777 and supports the standard MD5 challenge flow. That gives InnerOS a narrower and more structured management surface than automating the legacy web UI.
+
+The adapter in `src/voiceops/adapters/grandstream_ami.py` is fail-closed:
+
+- no `Originate` yet;
+- no `Command` action;
+- no `Hangup`, `Redirect`, transfer, config writes, or route writes;
+- only explicit read-only actions are accepted;
+- authentication uses AMI MD5 challenge/key rather than sending the secret as an AMI `Secret` field;
+- credentials are resolved only at call time;
+- production should inject credentials from a server-side vault via `credential_loader`;
+- arbitrary AMI headers and action injection are rejected.
+
+Initial read-only capabilities:
+
+- AMI reachability/challenge probe;
+- authenticated ping;
+- core status;
+- extension status via `SIPshowpeer`;
+- SIP peer inventory via `SIPpeers`;
+- bounded channel/status inspection actions.
+
+## Runtime configuration
+
+Preferred production path: a server-side credential loader backed by Owner Vault/Secret Manager.
+
+Environment fallback supported by the adapter:
+
+- `VOICEOPS_TELEPHONY_AMI_HOST`
+- `VOICEOPS_TELEPHONY_AMI_PORT` (verified UCM value: `7777`)
+- `VOICEOPS_TELEPHONY_AMI_USERNAME`
+- `VOICEOPS_TELEPHONY_AMI_SECRET`
+
+Never commit an AMI or PBX secret to Git, evidence files, coordination logs, screenshots, or test fixtures.
+
+## Required PBX service identity
+
+Do not reuse the administrator login and do not make extension `1000` the permanent Ralphi identity.
+
+Create a dedicated AMI account for VoiceOps with the smallest read permissions needed for the initial phase. Its source ACL should be restricted to the InnerOS LAN nodes that actually need access. Write permissions should remain absent until outbound calling is explicitly implemented and governed.
+
+Separately, when the active SIP bind/transport is known, create a dedicated Ralphi SIP extension. That extension is the voice/media endpoint; the AMI service account is the management/control identity. Keeping them separate avoids turning one leaked credential into universal PBX access.
+
+## Planned governed call flow
+
+Future write-enabled flow, not yet active:
+
+`event/user intent -> VoiceOps policy -> target allowlist -> explicit approval when required -> Voice Execution Permit -> AMI Originate/SIP media bridge -> AssemblyAI -> AMD .5 reasoning -> bounded action -> audit/evidence`
+
+Policy target:
+
+- internal extensions: eligible for automatic calling under policy;
+- owner extensions: eligible for automatic calling under policy;
+- external allowlist: bounded and audited;
+- unknown external numbers: explicit approval;
+- international calling: disabled by default;
+- duration/spend caps: required before external calling;
+- every call: destination, reason, timestamps, result and permit evidence recorded.
+
+## Remaining live verification
+
+1. Provision or safely retrieve a dedicated read-only AMI service credential.
+2. Authenticate through AMI and read `CoreStatus` / SIP peer inventory.
+3. Verify whether extension `1000` still exists and its live registration status.
+4. Read current SIP peer inventory to identify the actual active SIP stack and endpoint names.
+5. Determine the current SIP bind/transport through authenticated PBX configuration or an approved read-only management surface.
+6. Read current trunks and inbound/outbound routes through an approved read-only PBX surface.
+7. Confirm the current DID/house number from live configuration rather than historical notes.
+8. Create a dedicated Ralphi SIP extension only after those facts are known.
+9. Keep call origination disabled until the Voice Execution Permit path and telephony policy are connected end-to-end.
