@@ -1,6 +1,6 @@
 # Hackathon Checklist
 
-Last verified: 2026-09-12/13 GYT
+Last verified: 2026-09-13 GYT
 
 Legend:
 - `[x]` verified, implemented, or backed by captured runtime evidence.
@@ -60,8 +60,9 @@ Legend:
 - [x] `python3 -m compileall -q src tests` passes.
 - [x] `git diff --check` passes.
 - [x] Canonical runtime workspace was rehydrated and verified at exact GitHub SHA `50fea125b3b19ede3f228a3263d5af3eef3aa132` before final release packaging.
-- [x] GitHub CI workflow added for Python 3.11/3.12; mark CI green only after the final PR run completes.
-- [ ] Final release/merge SHA recorded after this release-packaging PR lands in `main`.
+- [x] GitHub CI workflow added for Python 3.11/3.12.
+- [x] Release-packaging PR #9 CI completed successfully.
+- [x] Final release merge recorded: `05887f268c90e3c5d649d5d045a9835cdaf6d372`.
 
 ## Public deployment
 - [x] Canonical public URL exists: `https://voiceops.creatorcore.ai/`.
@@ -98,7 +99,7 @@ Legend:
 - [x] Canonical tests re-run on the reconciled source: 60/60 PASS.
 - [x] AssemblyAI global provider preflight PASS with Owner Vault auth.
 - [x] Public claims/truth boundaries documented in `evidence/FINAL_RELEASE_20260912.md`.
-- [ ] CI checks green on the final release-packaging PR.
+- [x] CI checks green on the final release-packaging PR.
 - [ ] Secret scan over the exact final release tree.
 - [ ] Fresh judge screenshots + browser-microphone recording for media.
 - [ ] Verify organizer's exact closing hour immediately before submission.
@@ -106,12 +107,12 @@ Legend:
 
 ## Current P0
 
-The technical product core is **submission-ready**. Remaining P0 work is release verification plus media/organizer actions:
+The technical product core is **submission-ready**. Release packaging and CI are closed. Remaining P0 work is media plus organizer submission:
 
-1. Merge this final release-packaging PR after CI is green.
-2. Record the resulting final `main` SHA.
-3. Capture judge screenshots and a fresh microphone demo recording.
-4. Upload video/deck/media and insert their URLs into the submission package.
+1. Run the exact-final-tree secret scan and preserve sanitized evidence.
+2. Capture judge screenshots and a fresh browser-microphone demo recording.
+3. Upload video/deck/media and insert their URLs into the submission package.
+4. Verify team/project metadata and the organizer's exact closing hour.
 5. Submit on lablab.ai before the internal September 29 freeze.
 
 Do not fork, rebuild, or revive historical VoiceOps branches to accomplish these steps.
