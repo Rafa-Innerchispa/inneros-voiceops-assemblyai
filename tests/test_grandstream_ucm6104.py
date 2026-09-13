@@ -25,7 +25,7 @@ class FakeCGI:
                 "response": {
                     "sip_general_settings": {
                         "realm": "ucm6104",
-                        "bindport": "25000",
+                        "bindport": "4321",
                         "bindaddr": "0.0.0.0",
                         "bindaddr6": "::",
                         "allowguest": "no",
@@ -41,12 +41,48 @@ class FakeCGI:
                 "response": {"sip_sessiontimer_settings": {"session_expires": "1800"}},
             },
             "getSIPTCPSettings": {"status": 0, "response": {"sip_tcp_settings": {"tcpenable": "no"}}},
-            "getSIPNATSettings": {"status": 0, "response": {"sip_nat_settings": {"externudpport": "25000"}}},
+            "getSIPNATSettings": {"status": 0, "response": {"sip_nat_settings": {"externudpport": "4321"}}},
             "getTOSSettings": {"status": 0, "response": {"tos_settings": {"tos_sip": "cs3"}}},
-            "getSIPAccountList": {"status": 0, "response": {"extension": [{"extension": "1000"}]}},
-            "getTrunkList": {"status": 0, "response": {"trunks": [{"name": "provider"}]}},
-            "getOutboundRouteList": {"status": 0, "response": {"outbound_routes": [{"name": "out"}]}},
-            "getInboundRouteList": {"status": 0, "response": {"inbound_routes": [{"name": "in"}]}},
+            "getRTPSettings": {
+                "status": 0,
+                "response": {"rtp_settings": {"rtpstart": "10000", "rtpend": "20000"}},
+            },
+            "getPayloadSettings": {
+                "status": 0,
+                "response": {"payload_settings": {"fixture": "read-only"}},
+            },
+            "getBackupSettings": {
+                "status": 0,
+                "response": {"type": {"config": "yes", "cdr": "yes"}},
+            },
+            "getUpgradeValue": {
+                "status": 0,
+                "response": {"upgrade-via": "http", "firmware-server-path": ""},
+            },
+            "listAccount": {
+                "status": 0,
+                "response": {"account": [{"extension": "1000"}], "total_item": 1},
+            },
+            "listVoIPTrunk": {
+                "status": 0,
+                "response": {"voiptrunk": [{"trunk_name": "provider"}], "total_item": 1},
+            },
+            "listTrunkGroup": {
+                "status": 0,
+                "response": {"trunkgroup": [{"name": "group-1"}], "total_item": 1},
+            },
+            "listAnalogTrunk": {
+                "status": 0,
+                "response": {"analogtrunk": [{"trunk_name": "fxo-1"}], "total_item": 1},
+            },
+            "listOutboundRoute": {
+                "status": 0,
+                "response": {"outbound_routes": [{"name": "out"}], "total_item": 1},
+            },
+            "listInboundRoute": {
+                "status": 0,
+                "response": {"inbound_routes": [{"name": "in"}], "total_item": 1},
+            },
         }
 
     def __call__(self, host: str, port: int, form: dict[str, str], timeout: float, verify_tls: bool) -> dict:
@@ -96,7 +132,18 @@ def test_non_readonly_actions_fail_before_transport() -> None:
     fake = FakeCGI()
     client = authenticated_client(fake)
     before = len(fake.calls)
-    for action in ("updateSIPGenSettings", "addSipNetAddrSettings", "deleteSipNetAddrSettings", "Originate", "Command"):
+    for action in (
+        "updateSIPGenSettings",
+        "addSipNetAddrSettings",
+        "deleteSipNetAddrSettings",
+        "backupUCMConfig",
+        "restoreUCMConfig",
+        "setUpgradeValue",
+        "updateUser",
+        "deleteOutboundRoute",
+        "Originate",
+        "Command",
+    ):
         with pytest.raises(UCM6104ReadOnlyViolation):
             client.read_action(action)
     assert len(fake.calls) == before
@@ -117,7 +164,7 @@ def test_general_settings_are_normalized_from_exact_firmware_fields() -> None:
     settings = client.get_sip_general_settings()
     assert settings == SIPGeneralSettings(
         realm="ucm6104",
-        bind_udp_port=25000,
+        bind_udp_port=4321,
         bind_ipv4_address="0.0.0.0",
         bind_ipv6_address="::",
         allow_guest_calls=False,
@@ -135,22 +182,60 @@ def test_sip_snapshot_uses_only_firmware_read_actions() -> None:
     fake = FakeCGI()
     client = authenticated_client(fake)
     snapshot = client.get_sip_snapshot()
-    assert snapshot["general"]["bindport"] == "25000"
+    assert snapshot["general"]["bindport"] == "4321"
     assert snapshot["misc"]["videosupport"] == "no"
     assert snapshot["session_timer"]["session_expires"] == "1800"
     assert snapshot["tcp_tls"]["tcpenable"] == "no"
-    assert snapshot["nat"]["externudpport"] == "25000"
+    assert snapshot["nat"]["externudpport"] == "4321"
     assert snapshot["tos"]["tos_sip"] == "cs3"
 
 
-def test_inventory_helpers_remain_read_only() -> None:
+def test_inventory_helpers_use_exact_live_firmware_read_actions() -> None:
     fake = FakeCGI()
     client = authenticated_client(fake)
-    assert client.get_extension_inventory()["extension"][0]["extension"] == "1000"
-    assert client.get_trunk_inventory()["trunks"][0]["name"] == "provider"
+
+    extensions = client.get_extension_inventory()
+    assert extensions["account"][0]["extension"] == "1000"
+
+    trunks = client.get_trunk_inventory()
+    assert trunks["voip"]["voiptrunk"][0]["trunk_name"] == "provider"
+    assert trunks["groups"]["trunkgroup"][0]["name"] == "group-1"
+    assert trunks["analog"]["analogtrunk"][0]["trunk_name"] == "fxo-1"
+
     routes = client.get_route_inventory()
     assert routes["outbound"]["outbound_routes"][0]["name"] == "out"
     assert routes["inbound"]["inbound_routes"][0]["name"] == "in"
+
+    called = [call["action"] for call in fake.calls]
+    assert "listAccount" in called
+    assert "listVoIPTrunk" in called
+    assert "listTrunkGroup" in called
+    assert "listAnalogTrunk" in called
+    assert "listOutboundRoute" in called
+    assert "listInboundRoute" in called
+
+
+def test_prechange_snapshot_collects_only_read_actions() -> None:
+    fake = FakeCGI()
+    client = authenticated_client(fake)
+    snapshot = client.get_telephony_snapshot()
+
+    assert snapshot["rtp"]["rtp_settings"]["rtpstart"] == "10000"
+    assert snapshot["payload"]["payload_settings"]["fixture"] == "read-only"
+    assert snapshot["backup"]["type"]["config"] == "yes"
+    assert snapshot["upgrade"]["upgrade-via"] == "http"
+
+    mutating = {
+        "backupUCMConfig",
+        "restoreUCMConfig",
+        "setUpgradeValue",
+        "updateUser",
+        "deleteOutboundRoute",
+        "deleteInboundRoute",
+    }
+    assert not mutating.intersection(call["action"] for call in fake.calls)
+    backup_call = next(call for call in fake.calls if call["action"] == "getBackupSettings")
+    assert backup_call["type"] == "realtime"
 
 
 def test_nonzero_read_status_is_error_without_exposing_session_material() -> None:
