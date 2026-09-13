@@ -6,6 +6,15 @@ from .grandstream_ami import (
     AMIProbeResult,
     GrandstreamAMIAdapter,
 )
+from .grandstream_ucm6104 import (
+    GrandstreamUCM6104ReadOnlyCGI,
+    SIPGeneralSettings,
+    UCM6104AuthenticationError,
+    UCM6104Error,
+    UCM6104ProtocolError,
+    UCM6104ReadOnlyViolation,
+    UCM6104SessionInfo,
+)
 
 __all__ = [
     "AMIAuthenticationError",
@@ -14,5 +23,12 @@ __all__ = [
     "AMIProbeResult",
     "AssemblyAIStreamingAdapter",
     "GrandstreamAMIAdapter",
+    "GrandstreamUCM6104ReadOnlyCGI",
+    "SIPGeneralSettings",
     "StreamingState",
+    "UCM6104AuthenticationError",
+    "UCM6104Error",
+    "UCM6104ProtocolError",
+    "UCM6104ReadOnlyViolation",
+    "UCM6104SessionInfo",
 ]
