@@ -105,3 +105,38 @@ Policy target:
 7. Confirm the current DID/house number from live configuration rather than historical notes.
 8. Create a dedicated Ralphi SIP extension only after those facts are known.
 9. Keep call origination disabled until the Voice Execution Permit path and telephony policy are connected end-to-end.
+
+## SIP General Settings discovery from the live firmware UI
+
+The live UCM6104 frontend bundle was inspected read-only on 2026-09-13. The `sipSettings` webpack chunk is `/sipSettings.569c47e4.chunk.js`. The firmware reads the General SIP page with:
+
+- CGI action: `getSIPGenSettings`
+- response object: `response.sip_general_settings`
+- Realm for Digest Authentication: `realm`
+- Bind UDP Port: `bindport`
+- Bind IPv4 address: `bindaddr`
+- Bind IPv6 address: `bindaddr6`
+- Allow Guest Calls: `allowguest`
+- Allow Transfer: `allowtransfer`
+- MWI From Header: `mwi_from`
+- Enable Diversion Header: `enable_diversion`
+
+The same chunk confirms these additional read groups:
+
+- `getSIPMiscSettings` -> `sip_misc_settings`
+- `getSIPSSTimerSettings` -> `sip_sessiontimer_settings`
+- `getSIPTCPSettings` -> `sip_tcp_settings`
+- `getSIPNATSettings` -> `sip_nat_settings`
+- `getTOSSettings` -> SIP ToS/media settings
+
+An unauthenticated `getSIPGenSettings` request returns HTTP 200 with UCM status `-6`, so the configuration is session-protected. No attempt is made to bypass that gate.
+
+`src/voiceops/adapters/grandstream_ucm6104.py` implements the bounded setup/discovery path. It uses the firmware's existing `challenge` -> MD5(`challenge + password`) -> `login` sequence, keeps only the short-lived session cookie in memory, never stores the password on the adapter, and permits only an explicit read-only CGI allowlist. Any `update*`, add/delete, `Originate`, `Command`, or other non-allowlisted action is rejected before a network request is made.
+
+This creates a deliberate split:
+
+`AMI :7777 = live telephony/status control plane`
+
+`legacy CGI :8089 = temporary authenticated configuration discovery`
+
+The CGI reader is intended to establish the authoritative current SIP bind, transports, trunks and routes. It is not the long-term automation surface.
