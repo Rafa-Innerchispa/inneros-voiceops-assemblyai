@@ -2,7 +2,7 @@
 
 Date: 2026-09-13 (America/Guayaquil)
 Owner project: `Rafa-Innerchispa/inneros-voiceops-assemblyai`
-Canonical base before this handoff: `8294d5eed07cf2d1b78693d74ac81ff3534239e1`
+Canonical `main` observed when this handoff was finalized: `1b6664abf3752832623e231170de5d95b650ab6f`
 
 ## 1. Goal
 
@@ -57,7 +57,7 @@ Web CGI auth behavior already verified historically:
 
 Do not store or paste the PBX admin password in chat, Git, logs, docs, or source code.
 
-## 3. Exact UCM firmware API discoveries already integrated
+## 3. Exact UCM firmware/API discoveries already integrated
 
 The live SIP settings UI uses `getSIPGenSettings`, with `response.sip_general_settings` and these exact fields:
 
@@ -70,7 +70,7 @@ The live SIP settings UI uses `getSIPGenSettings`, with `response.sip_general_se
 - `mwi_from`
 - `enable_diversion`
 
-Other verified read actions include:
+Other SIP/config read actions discovered from the live firmware include:
 
 - `getSIPMiscSettings`
 - `getSIPSSTimerSettings`
@@ -79,15 +79,24 @@ Other verified read actions include:
 - `getTOSSettings`
 - `getUsedPortInfo`
 - `listSipNetAddrSettings`
-- `getSIPAccountList`
-- `getAccountList`
 - `getExtenPrefSettings`
-- `getTrunkList`
-- `getOutboundRouteList`
-- `getInboundRouteList`
-- `getAnalogTrunkList`
 
-Firmware routes also expose maintenance pages for `backup` and `upgrade`, and feature pages for `ami`, `rtpSettings`, trunks, routes, etc.
+PR #14 subsequently aligned the production CGI adapter to the exact live inventory/read action names used by this firmware:
+
+- `listAccount`
+- `listVoIPTrunk`
+- `listTrunkGroup`
+- `listAnalogTrunk`
+- `listOutboundRoute`
+- `listInboundRoute`
+- `getRTPSettings`
+- `getPayloadSettings`
+- `getBackupSettings`
+- `getUpgradeValue`
+
+The adapter now also has a bounded pre-change telephony snapshot covering SIP, RTP, payloads, extensions, trunks, routes, backup settings and upgrade settings.
+
+Firmware routes expose maintenance pages for `backup` and `upgrade`, plus feature pages for `ami`, `rtpSettings`, trunks, routes, etc.
 
 ## 4. VoiceOps adapters already merged
 
@@ -111,7 +120,8 @@ Firmware routes also expose maintenance pages for `backup` and `upgrade`, and fe
 - short-lived session cookie only;
 - strict read-only action allowlist;
 - normalized SIP General Settings;
-- helper inventory reads for extensions, trunks and routes.
+- exact live extension/trunk/route/RTP/backup/upgrade read actions;
+- bounded pre-change snapshot helper.
 
 Related merged PRs before this handoff:
 
@@ -119,12 +129,13 @@ Related merged PRs before this handoff:
 - PR #11: read-only UCM6104 CGI adapter
 - PR #12: document live SIP 4321/0.0.0.0 truth
 - PR #13: Ecuador outbound telephony policy and remote access runbook
+- PR #14: exact live UCM6104 read actions plus bounded pre-change snapshot
 
-Canonical `main` after PR #13:
+Canonical `main` after PR #14 and before this handoff PR:
 
-`8294d5eed07cf2d1b78693d74ac81ff3534239e1`
+`1b6664abf3752832623e231170de5d95b650ab6f`
 
-Full VoiceOps suite at that point: `87 PASS`.
+Full VoiceOps suite at that point: `88 PASS`.
 
 ## 5. Outbound calling policy already implemented
 
@@ -248,19 +259,20 @@ No PBX configuration, UniFi VPN configuration, firmware upgrade, new extension, 
 Do not re-research from zero. Continue exactly here:
 
 1. Read this file and `docs/TELEPHONY_UCM6104.md` plus `docs/REMOTE_TELEPHONY_US_EC.md`.
-2. Confirm canonical `main` and repo cleanliness.
+2. Confirm canonical `main` and repo cleanliness; bootstrap/re-align the `.4` runtime to current `main` if needed.
 3. Create fresh loopback-only human browser sessions for:
    - UCM admin (`192.168.1.6:8089` via local reverse proxy);
    - UniFi OS (`192.168.1.1` via local reverse proxy).
 4. Have owner enter credentials into those browser sessions, never into chat.
 5. On UCM, first create/download a full backup and preserve it outside Git.
-6. Read and record current authoritative:
+6. Use the bounded pre-change snapshot/read helpers to record current authoritative:
    - extensions/SIP accounts;
-   - trunks;
+   - trunks and trunk groups;
    - inbound routes;
    - outbound routes and dial patterns/prefixes;
-   - RTP range;
+   - RTP and payload settings;
    - SIP TCP/TLS state if relevant;
+   - backup/upgrade settings;
    - AMI settings/available service identity options.
 7. Configure UniFi Teleport with the minimum access needed for the remote phone to reach the PBX LAN address. Do not expose SIP/RTP publicly.
 8. Verify tunnel reachability to `192.168.1.6` and UDP 4321 from a remote client when available.
@@ -287,7 +299,7 @@ Do not re-research from zero. Continue exactly here:
 
 ## 13. Infrastructure note
 
-Primary VoiceOps runtime on `.4` was aligned to canonical `main` after PR #13.
+Primary VoiceOps runtime on `.4` was aligned to the earlier PR #13 canonical `main`. Before executing PBX mutations in the next chat, bootstrap/re-align the primary runtime to the current canonical `main` and verify a clean worktree.
 
 The VoiceOps runtime registry path on AMD `.5` previously reported `not_git_repository`; this is infrastructure debt, not a PBX/VoiceOps feature failure. Do not silently destroy/replace that path without deliberate Runtime Registry reconciliation.
 
