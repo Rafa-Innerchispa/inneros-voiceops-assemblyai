@@ -298,7 +298,8 @@ class VoiceOpsHandler(BaseHTTPRequestHandler):
                     "service": "inneros-voiceops",
                     "live_voice_enabled": bool(self.server.live_voice_enabled),  # type: ignore[attr-defined]
                     "credential_configured": bool(os.getenv("ASSEMBLYAI_API_KEY")),
-                    "guardian_voice_bridge_enabled": bool(self.server.bridge_token),  # type: ignore[attr-defined]
+                    "guardian_voice_bridge_enabled": bool(self.server.bridge_token) or self._loopback_bridge_allowed(),  # type: ignore[attr-defined]
+                    "guardian_voice_bridge_mode": "token" if self.server.bridge_token else ("loopback_only" if self._loopback_bridge_allowed() else "disabled"),  # type: ignore[attr-defined]
                     "production_writes": False,
                 }
             )
@@ -384,13 +385,18 @@ class VoiceOpsHandler(BaseHTTPRequestHandler):
                 status=HTTPStatus.BAD_GATEWAY,
             )
 
+    def _loopback_bridge_allowed(self) -> bool:
+        server_host = str(self.server.server_address[0] or "")
+        client_host = str(self.client_address[0] or "")
+        return server_host in {"127.0.0.1", "::1", "localhost"} and client_host in {"127.0.0.1", "::1"}
+
     def _bridge_authorized(self) -> bool:
         expected = str(self.server.bridge_token or "")  # type: ignore[attr-defined]
-        if not expected:
-            return False
-        raw = self.headers.get("Authorization", "")
-        prefix = "Bearer "
-        return raw.startswith(prefix) and hmac.compare_digest(raw[len(prefix):].strip(), expected)
+        if expected:
+            raw = self.headers.get("Authorization", "")
+            prefix = "Bearer "
+            return raw.startswith(prefix) and hmac.compare_digest(raw[len(prefix):].strip(), expected)
+        return self._loopback_bridge_allowed()
 
     def _handle_voice_agent_token(self) -> None:
         if not bool(self.server.live_voice_enabled):  # type: ignore[attr-defined]
