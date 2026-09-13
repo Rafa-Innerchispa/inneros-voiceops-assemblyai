@@ -39,12 +39,23 @@ READ_ONLY_ACTIONS = frozenset(
         "getSIPNATSettings",
         "getTOSSettings",
         "getUsedPortInfo",
+        "getRTPSettings",
+        "getPayloadSettings",
+        "getBackupSettings",
+        "getUpgradeValue",
+        "getInterfaceStatus",
         "getSIPAccountList",
         "getAccountList",
+        "listAccount",
         "getExtenPrefSettings",
         "getTrunkList",
+        "listVoIPTrunk",
+        "listTrunkGroup",
+        "listAnalogTrunk",
         "getOutboundRouteList",
+        "listOutboundRoute",
         "getInboundRouteList",
+        "listInboundRoute",
         "getAnalogTrunkList",
         "listSipNetAddrSettings",
     }
@@ -158,8 +169,6 @@ class GrandstreamUCM6104ReadOnlyCGI:
         try:
             self._post({"action": "logout", "user": user, "cookie": cookie})
         except Exception:
-            # Local session state is already cleared. Logout failure must not
-            # leak credentials/cookies through a secondary exception path.
             return
 
     def read_action(self, action: str, **params: Any) -> dict[str, Any]:
@@ -235,15 +244,59 @@ class GrandstreamUCM6104ReadOnlyCGI:
         return snapshot
 
     def get_extension_inventory(self) -> dict[str, Any]:
-        return self.read_action("getSIPAccountList")
+        """Read the extension table using the exact action used by this firmware UI."""
 
-    def get_trunk_inventory(self) -> dict[str, Any]:
-        return self.read_action("getTrunkList")
+        return self.read_action("listAccount", item_num=1000, page=1)
+
+    def get_trunk_inventory(self) -> dict[str, dict[str, Any]]:
+        """Read VoIP, trunk-group, and analog inventories without mutating the PBX."""
+
+        return {
+            "voip": self.read_action("listVoIPTrunk", item_num=1000, page=1),
+            "groups": self.read_action("listTrunkGroup", item_num=1000, page=1),
+            "analog": self.read_action("listAnalogTrunk", item_num=1000, page=1),
+        }
 
     def get_route_inventory(self) -> dict[str, dict[str, Any]]:
+        """Read inbound and outbound route tables using exact live firmware actions."""
+
         return {
-            "outbound": self.read_action("getOutboundRouteList"),
-            "inbound": self.read_action("getInboundRouteList"),
+            "outbound": self.read_action("listOutboundRoute", item_num=1000, page=1),
+            "inbound": self.read_action("listInboundRoute", item_num=1000, page=1),
+        }
+
+    def get_rtp_settings(self) -> dict[str, Any]:
+        """Read live RTP settings used to derive media/firewall requirements."""
+
+        return self.read_action("getRTPSettings")
+
+    def get_payload_settings(self) -> dict[str, Any]:
+        """Read RTP payload mappings from the exact firmware page action."""
+
+        return self.read_action("getPayloadSettings")
+
+    def get_backup_settings(self) -> dict[str, Any]:
+        """Read backup capabilities before any backup/upgrade mutation is attempted."""
+
+        return self.read_action("getBackupSettings", type="realtime")
+
+    def get_upgrade_settings(self) -> dict[str, Any]:
+        """Read firmware-upgrade settings without uploading or changing firmware."""
+
+        return self.read_action("getUpgradeValue")
+
+    def get_telephony_snapshot(self) -> dict[str, Any]:
+        """Collect the exact read-only state required before telephony changes."""
+
+        return {
+            "sip": self.get_sip_snapshot(),
+            "rtp": self.get_rtp_settings(),
+            "payload": self.get_payload_settings(),
+            "extensions": self.get_extension_inventory(),
+            "trunks": self.get_trunk_inventory(),
+            "routes": self.get_route_inventory(),
+            "backup": self.get_backup_settings(),
+            "upgrade": self.get_upgrade_settings(),
         }
 
     def _post(self, form: dict[str, str]) -> dict[str, Any]:
