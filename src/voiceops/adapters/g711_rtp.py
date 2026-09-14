@@ -3,6 +3,7 @@ from __future__ import annotations
 import secrets
 import struct
 from dataclasses import dataclass
+from typing import Iterable, Iterator
 
 PCMU_PAYLOAD_TYPE = 0
 PCMA_PAYLOAD_TYPE = 8
@@ -137,6 +138,37 @@ class G711AssemblyAudioBridge:
         self.last_sequence = packet.sequence
         self.received_packets += 1
         return upsample_pcm16_8k_to_16k(pcm8)
+
+    def iter_assemblyai_pcm16(
+        self,
+        datagrams: Iterable[bytes],
+        *,
+        chunk_ms: int = 100,
+    ) -> Iterator[bytes]:
+        """Coalesce RTP frames into provider-valid PCM16 streaming chunks.
+
+        UCM G.711 commonly arrives in 20 ms RTP frames, while AssemblyAI
+        Streaming v3 accepts input chunks between 50 and 1000 ms. A final
+        short tail is padded with silence to the 50 ms provider minimum.
+        """
+        if not 50 <= chunk_ms <= 1000:
+            raise ValueError("chunk_ms must be between 50 and 1000 milliseconds")
+        bytes_per_ms = ASSEMBLYAI_SAMPLE_RATE * 2 // 1000
+        target_bytes = bytes_per_ms * chunk_ms
+        minimum_bytes = bytes_per_ms * 50
+        buffer = bytearray()
+        for datagram in datagrams:
+            decoded = self.decode_rtp_for_assemblyai(datagram)
+            if not decoded:
+                continue
+            buffer.extend(decoded)
+            while len(buffer) >= target_bytes:
+                yield bytes(buffer[:target_bytes])
+                del buffer[:target_bytes]
+        if buffer:
+            if len(buffer) < minimum_bytes:
+                buffer.extend(b"\x00" * (minimum_bytes - len(buffer)))
+            yield bytes(buffer)
 
     def encode_assemblyai_pcm_for_rtp(self, pcm16_16k: bytes, *, marker: bool = False) -> bytes:
         pcm8 = downsample_pcm16_16k_to_8k(pcm16_16k)
