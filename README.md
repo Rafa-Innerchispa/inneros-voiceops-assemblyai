@@ -1,5 +1,16 @@
 # InnerOS VoiceOps — AssemblyAI Voice Agent Hackathon 2026
 
+<!-- INNEROS-NARRATIVE:START -->
+> **InnerOS role:** R&D / Hackathon Validation  
+> **Lifecycle:** Submission repository  
+> **Lineage:** AssemblyAI Voice Agent Hackathon 2026; reusable voice, approval, and evidence capabilities flow into the maintained VoiceOps product.
+>
+> VoiceOps makes speech an interface to governed InnerOS execution rather than a standalone chatbot experience.
+>
+> **InnerOS principle:** hackathons are validation environments. Reusable capabilities are extracted into maintained products and platform layers rather than treated as disconnected one-off projects.
+<!-- INNEROS-NARRATIVE:END -->
+
+
 > **Speak an intent. InnerOS turns it into governed execution and proves what happened.**
 
 InnerOS VoiceOps is a local-first voice control plane for service operations and physical-world workflows. AssemblyAI provides realtime speech understanding; InnerOS provides context, routing, policy, approval, execution, and evidence.
