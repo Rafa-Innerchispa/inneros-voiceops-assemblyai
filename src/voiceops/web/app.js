@@ -10,7 +10,10 @@ const els = {
   routePolicy: $("routePolicy"), routeFallback: $("routeFallback"), routeTruth: $("routeTruth"),
   proposalEmpty: $("proposalEmpty"), proposalData: $("proposalData"), approvalGate: $("approvalGate"), actionResult: $("actionResult"),
   timeline: $("timeline"), htrBox: $("htrBox"), sessionId: $("sessionId"), correlationId: $("correlationId"),
-  liveVoiceBtn: $("liveVoiceBtn"), stopVoiceBtn: $("stopVoiceBtn"), voiceAgentStatus: $("voiceAgentStatus"), agentTranscript: $("agentTranscript")
+  liveVoiceBtn: $("liveVoiceBtn"), stopVoiceBtn: $("stopVoiceBtn"), voiceAgentStatus: $("voiceAgentStatus"), agentTranscript: $("agentTranscript"),
+  memoryBeforeTruth: $("memoryBeforeTruth"), memoryBeforeProvider: $("memoryBeforeProvider"), memoryBeforeCount: $("memoryBeforeCount"), memoryBeforeSummary: $("memoryBeforeSummary"),
+  memoryAfterTruth: $("memoryAfterTruth"), memoryAfterProvider: $("memoryAfterProvider"), memoryAfterCount: $("memoryAfterCount"), memoryAfterSummary: $("memoryAfterSummary"),
+  flowVoice: $("flowVoice"), flowMemory: $("flowMemory"), flowReason: $("flowReason"), flowApprove: $("flowApprove"), flowAct: $("flowAct"), flowVerify: $("flowVerify"), flowShare: $("flowShare")
 };
 
 async function api(path, options = {}) {
@@ -81,6 +84,57 @@ function renderRoute(route) {
   }
 }
 
+function truthKind(truth) {
+  if (truth === "LIVE") return "success";
+  if (truth === "SYNTHETIC" || truth === "REPLAY") return "warning";
+  if (truth === "UNVERIFIED") return "blocked";
+  return "";
+}
+
+function setFlow(el, active, complete = false) {
+  if (!el) return;
+  el.className = "flow-step";
+  if (complete) el.classList.add("complete");
+  else if (active) el.classList.add("active");
+}
+
+function renderMemory(state) {
+  const shared = state.shared_memory || {};
+  const before = shared.before_action || {};
+  const writeback = shared.writeback || {};
+  const cross = shared.cross_agent_recall || {};
+
+  const beforeTruth = before.truth || "WAITING";
+  setState(els.memoryBeforeTruth, beforeTruth, truthKind(beforeTruth));
+  els.memoryBeforeProvider.textContent = before.provider || shared.bridge?.provider || "—";
+  els.memoryBeforeCount.textContent = before.count ?? "—";
+  const firstBefore = Array.isArray(before.hits) && before.hits.length ? before.hits[0] : null;
+  els.memoryBeforeSummary.textContent = firstBefore?.summary || (
+    before.status === "unavailable"
+      ? "Live shared memory is unavailable for this run. No memory is treated as authorization."
+      : "No prior operational memory recalled yet."
+  );
+
+  const afterTruth = cross.truth || writeback.truth || "WAITING";
+  setState(els.memoryAfterTruth, afterTruth, truthKind(afterTruth));
+  els.memoryAfterProvider.textContent = cross.provider || writeback.provider || shared.bridge?.provider || "—";
+  els.memoryAfterCount.textContent = cross.count ?? (writeback.stored ? 0 : "—");
+  const firstAfter = Array.isArray(cross.hits) && cross.hits.length ? cross.hits[0] : null;
+  els.memoryAfterSummary.textContent = firstAfter?.summary || (
+    writeback.stored
+      ? `Verified outcome stored as ${writeback.memory_id || "shared memory"}; waiting for recall proof.`
+      : "A verified outcome will be stored only after explicit approval and recorded execution."
+  );
+
+  setFlow(els.flowVoice, Boolean(state.transcript), Boolean(state.transcript));
+  setFlow(els.flowMemory, Boolean(before.status), Boolean(before.count));
+  setFlow(els.flowReason, Boolean(state.route && Object.keys(state.route).length), Boolean(state.proposal));
+  setFlow(els.flowApprove, Boolean(state.pending_approval || state.approval), Boolean(state.approval?.approved));
+  setFlow(els.flowAct, Boolean(state.action), Boolean(state.action));
+  setFlow(els.flowVerify, Boolean(writeback.status || state.action), Boolean(writeback.verification_passed));
+  setFlow(els.flowShare, Boolean(cross.status), Boolean(cross.count));
+}
+
 function renderProposal(state) {
   const proposal = state.proposal;
   els.approvalGate.classList.add("hidden"); els.actionResult.classList.add("hidden");
@@ -130,7 +184,7 @@ function render(state) {
   if (!voiceAgent.liveTranscriptActive) els.transcript.textContent = state.transcript || "No transcript yet.";
   if (state.transcript && !voiceAgent.liveTranscriptActive) setState(els.voiceState, "FINAL TRANSCRIPT", "ready");
   else if (!voiceAgent.ready) setState(els.voiceState, "READY", "ready");
-  renderGuardian(state.guardian); renderRoute(state.route); renderProposal(state); renderTimeline(state.timeline);
+  renderGuardian(state.guardian); renderRoute(state.route); renderMemory(state); renderProposal(state); renderTimeline(state.timeline);
   els.approveBtn.disabled = !state.pending_approval; els.ambiguousBtn.disabled = !state.pending_approval; els.runBtn.disabled = state.pending_approval;
   if (state.action) els.demoStatus.textContent = `Completed: ${state.action.action_id}. Evidence sealed for replay.`;
   else if (state.approval && !state.approval.approved) els.demoStatus.textContent = "Ambiguous authorization was blocked. Explicit approval is still required.";

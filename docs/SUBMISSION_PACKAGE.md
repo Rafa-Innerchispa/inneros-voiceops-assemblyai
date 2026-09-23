@@ -2,27 +2,27 @@
 
 ## Final title
 
-**InnerOS VoiceOps — Governed Voice-to-Action for Real Operations**
+**InnerOS VoiceOps — Voice That Remembers and Acts Safely**
 
 ## Short description
 
-InnerOS VoiceOps turns spoken operational intent into safe, auditable action. AssemblyAI handles realtime voice; InnerOS binds finalized speech to explicit approval and a single-use execution permit; local AMD/Qwen reasoning proposes the action; Evidence/Replay records exactly what happened and Human Time Returned shows the operational impact.
+InnerOS VoiceOps turns spoken operational intent into safe, auditable action that can be remembered across agents. AssemblyAI handles realtime voice; InnerOS recalls prior verified outcomes, requires explicit approval, issues a single-use execution permit, records evidence, and writes only the verified result back to shared Personal Brain/Cognee memory.
 
 ## Long description
 
-Most voice agents stop at conversation. InnerOS VoiceOps crosses the harder boundary: from spoken intent to governed execution.
+Most voice agents stop at conversation or forget what happened after a tool call. InnerOS VoiceOps crosses both boundaries: from spoken intent to governed execution, and from verified execution to reusable operational memory.
 
 A user speaks naturally. AssemblyAI provides the realtime voice layer with turn handling, speech context, tool calling and interruption-aware interaction. InnerOS then treats the finalized transcript as evidence, not as automatic authorization. The system inspects operational state, proposes a bounded action, requests explicit approval and issues a short-lived single-use Voice Execution Permit bound to the exact session, event, transcript, proposal, state and action.
 
-Only after that permit validates can the demo action execute. Every step is captured in Decision Evidence, replayable afterwards, with Human Time Returned separated into measured and estimated claims.
+Only after that permit validates can the demo action execute. Every step is captured in Decision Evidence, replayable afterwards, with Human Time Returned separated into measured and estimated claims. After the result is recorded, VoiceOps creates a bounded verified-outcome memory record. Personal Brain curates it before Cognee storage, and a second correlation-bound recall demonstrates that another agent can remember what VoiceOps actually did.
 
 The project is local-first. AMD .5/Qwen provides the private reasoning path in the live local stack. AssemblyAI is a reusable platform provider rather than a product-specific secret. WhatsApp voice notes use the same reusable Voice Fabric with managed AssemblyAI STT and local Whisper fallback. Physical Guardian contributes sanitized `NormalizedEvent` incidents without duplicating camera logic inside VoiceOps.
 
-For judging, the public Cloud Run surface intentionally runs a safe synthetic reasoner and never performs production writes. The same governance state machine is used in the captured live AssemblyAI + AMD .5 E2E evidence. This keeps the public demo honest while showing the architecture that matters: **Intent -> Governed Execution -> Evidence -> Human Time Returned**.
+For judging, the public Cloud Run surface intentionally runs a safe synthetic reasoner, synthetic memory lane, and no production writes. The live-local stack can use Personal Brain/Cognee plus AssemblyAI and AMD .5. This keeps the public demo honest while showing the architecture that matters: **Voice -> Memory -> Reason -> Approval -> Action -> Verify -> Shared Recall**.
 
 ## What is novel
 
-VoiceOps does not equate a tool call with permission. It creates a cryptographically bound, short-lived, single-use execution permit only after exact finalized speech and explicit approval. Barge-in/cancellation and ambiguous approval fail closed. This makes voice usable for operational workflows where merely hearing the user is not enough.
+VoiceOps does not equate a tool call, a remembered fact, or a model recommendation with permission. It recalls prior verified outcomes before reasoning, but creates a cryptographically bound, short-lived, single-use execution permit only after exact finalized speech and explicit approval. After execution, only the bounded verified outcome is curated into shared memory. The result is a closed operational loop where Agent A can act and Agent B can later remember without memory ever becoming authorization.
 
 ## Technologies
 
@@ -38,6 +38,8 @@ VoiceOps does not equate a tool call with permission. It creates a cryptographic
 - WhatsApp / Evolution reusable Voice Fabric with local Whisper fallback
 - Physical Guardian sanitized `NormalizedEvent` contract
 - Decision Evidence / Forensic Replay / Human Time Returned
+- Personal Brain / Cognee shared operational memory bridge
+- truth-labeled memory states: LIVE / REPLAY / SYNTHETIC / UNVERIFIED
 - Google Cloud Run + Cloudflare public judge surface
 - Python 3.11/3.12
 
@@ -61,38 +63,39 @@ The submission repository remains the public hackathon artifact. Reusable produc
 1. Open the public demo.
 2. Reset the demo state.
 3. Submit an operational intent such as: `Review the north access incident and create a technical work order if appropriate.`
-4. Observe that the system proposes an action but does not execute it.
-5. Try an ambiguous phrase such as `If you think it is necessary.` The action stays blocked.
-6. Give explicit authorization: `Yes, I authorize it.`
-7. Observe the synthetic work order, execution-permit evidence, correlation/session identifiers and HTR result.
-8. Open Evidence / Replay and inspect the chronological decision trail.
+4. Observe the **BEFORE ACTION / RECALL** panel and its truth label.
+5. Observe that the system proposes an action but does not execute it.
+6. Try an ambiguous phrase such as `If you think it is necessary.` The action stays blocked and no memory write occurs.
+7. Give explicit authorization: `Yes, I authorize it.`
+8. Observe the synthetic work order, execution-permit evidence, correlation/session identifiers and HTR result.
+9. Observe **VERIFIED WRITEBACK** and **CROSS-AGENT RECALL** by correlation ID.
+10. Open Evidence / Replay and inspect the chronological decision trail.
 
 The public surface has `production_writes=false`. It is intentionally judge-safe.
 
 ## 75-second spoken pitch
 
-Voice agents are very good at talking. Real operations need something harder: knowing when speech is actually permission to act.
+Voice agents are good at talking. The harder problem is remembering what really happened without confusing memory with permission to act.
 
-InnerOS VoiceOps turns spoken intent into governed execution. AssemblyAI gives us the realtime voice layer. InnerOS takes the finalized transcript, inspects the operational state and asks our local AMD/Qwen reasoning layer what should happen next. But a recommendation is not authorization.
+InnerOS VoiceOps uses AssemblyAI as the realtime voice layer. Before reasoning, it can recall a prior verified operational outcome from shared memory. InnerOS then inspects current state and asks our local AMD/Qwen reasoning layer what should happen next. But memory and recommendations are context, not authorization.
 
 Before any consequential action, VoiceOps requires explicit approval and creates a short-lived, single-use execution permit cryptographically bound to the session, the incident, the exact approval transcript, the proposal and the state the agent saw. Ambiguous approval fails closed. Interruption does not become accidental execution.
 
-Then we create the bounded demo action and preserve the entire decision as replayable evidence. We also show Human Time Returned, because the real product is not tokens per second. It is how much coordination humans no longer have to do.
-
-The result is a voice agent designed not just to answer, but to act safely, locally and accountably.
+Then we create the bounded demo action and preserve the entire decision as replayable evidence. Only after the result exists do we curate a verified-outcome record into Personal Brain/Cognee. A second agent can recall the same correlation-bound outcome. The result is a voice agent designed not just to answer, but to remember verified operations, act safely, and prove what happened.
 
 ## Demo recording outline
 
-- 0–10 s: problem statement and one-screen UI
-- 10–25 s: spoken incident request through AssemblyAI
+- 0–10 s: problem statement and one-screen cognitive loop
+- 10–25 s: AssemblyAI voice request + prior memory recall
 - 25–38 s: proposal appears, ambiguous approval is rejected
 - 38–52 s: explicit approval, single-use permit, action result
-- 52–65 s: Evidence / Replay and HTR
-- 65–75 s: architecture card: AssemblyAI + InnerOS + AMD local reasoning + reusable WhatsApp/Guardian contracts
+- 52–68 s: verified outcome writeback + cross-agent recall
+- 68–80 s: Evidence / Replay and HTR
+- 80–90 s: architecture card: AssemblyAI + InnerOS + Personal Brain/Cognee + local reasoning + governed execution
 
 ## Evidence-backed claims allowed in submission
 
-- 60/60 canonical tests PASS on final technical verification.
+- 107/107 tests PASS on the shared-memory submission branch before CI merge.
 - Explicit approval fails closed for ambiguous phrases.
 - Voice Execution Permit is bound and single-use.
 - Public judge surface is deployed and returns a working `/api/state`.
@@ -102,7 +105,7 @@ The result is a voice agent designed not just to answer, but to act safely, loca
 
 ## Claims to avoid
 
-- Do not claim the public Cloud Run revision currently uses AMD .5; it runs the synthetic reasoner.
+- Do not claim the public Cloud Run revision currently uses AMD .5 or live Cognee; it runs the synthetic reasoner and should use the truth-labeled synthetic memory lane unless a new deployment is explicitly verified.
 - Do not claim live AssemblyAI is enabled on the public revision until a Secret Manager binding is deployed.
 - Do not claim production work-order or building-control writes; the hackathon action is bounded/synthetic.
 - Do not claim `/healthz` is healthy until its current 404 discrepancy is fixed; `/api/state` is the verified operational endpoint.
@@ -111,7 +114,7 @@ The result is a voice agent designed not just to answer, but to act safely, loca
 
 Technical build: **ready**.
 
-Release verification refreshed on 2026-09-22: **101/101 tests PASS**, `compileall` PASS, `git diff --check` PASS, bounded committed-secret regression scan PASS, no telephony mutation, no external model spend.
+Shared-memory branch verification: **107/107 tests PASS**, `compileall` PASS, `git diff --check` PASS, committed-secret regression test included, no telephony mutation, no external model spend. Personal Brain loopback verified-outcome receiver merged independently after green CI.
 
 Still manual before organizer submission:
 
