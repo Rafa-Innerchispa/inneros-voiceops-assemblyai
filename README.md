@@ -107,7 +107,7 @@ The public demo must never require customer PII, production credentials, or dest
 | Judge-facing one-screen UI | ✅ Implemented | Synthetic mode clearly labeled |
 | Resource Fabric local-first route | ✅ Verified | `local-amd-5` selected |
 | AMD .5 live bounded inference | ✅ Verified separately | Qwen on local vLLM; external fallback false |
-| Automated tests | ✅ **107/107 PASS** | Shared-memory submission branch verification, 2026-09-22/23 |
+| Automated tests | ✅ **108/108 PASS** | Final submission constraints + shared-memory verification, 2026-09-22/23 |
 | `compileall` | ✅ PASS | `src` + `tests`, 2026-09-22 |
 | `git diff --check` | ✅ PASS | 2026-09-22 |
 | Live AssemblyAI provider session | ✅ Verified | Captured in the private/local live stack; public demo remains intentionally synthetic |

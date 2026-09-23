@@ -2,11 +2,11 @@
 
 ## Final title
 
-**InnerOS VoiceOps — Voice That Remembers and Acts Safely**
+**InnerOS VoiceOps — Voice That Remembers**
 
 ## Short description
 
-InnerOS VoiceOps turns spoken operational intent into safe, auditable action that can be remembered across agents. AssemblyAI handles realtime voice; InnerOS recalls prior verified outcomes, requires explicit approval, issues a single-use execution permit, records evidence, and writes only the verified result back to shared Personal Brain/Cognee memory.
+AssemblyAI powers realtime voice while InnerOS recalls prior verified outcomes, requires explicit approval, executes with a single-use permit, proves the result, and shares only the verified outcome with Personal Brain/Cognee.
 
 ## Long description
 
@@ -95,7 +95,7 @@ Then we create the bounded demo action and preserve the entire decision as repla
 
 ## Evidence-backed claims allowed in submission
 
-- 107/107 tests PASS on the shared-memory submission branch before CI merge.
+- 108/108 tests PASS on the final submission branch, including LabLab field-limit checks.
 - Explicit approval fails closed for ambiguous phrases.
 - Voice Execution Permit is bound and single-use.
 - Public judge surface is deployed and returns a working `/api/state`.
@@ -114,7 +114,7 @@ Then we create the bounded demo action and preserve the entire decision as repla
 
 Technical build: **ready**.
 
-Shared-memory branch verification: **107/107 tests PASS**, `compileall` PASS, `git diff --check` PASS, committed-secret regression test included, no telephony mutation, no external model spend. Personal Brain loopback verified-outcome receiver merged independently after green CI.
+Final submission verification: **108/108 tests PASS**, `compileall` PASS, `git diff --check` PASS, committed-secret regression test and LabLab field-limit checks included, no telephony mutation, no external model spend. Personal Brain loopback verified-outcome receiver merged independently after green CI.
 
 Still manual before organizer submission:
 
