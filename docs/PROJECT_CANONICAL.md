@@ -110,13 +110,19 @@ Canonical flow:
 
 **Intent → Governed Execution → Evidence → Human Time Returned**
 
-## Current release blockers / next work
+## Current release state / next work
 
-1. Publish a judge-safe HTTPS endpoint, target `voiceops.creatorcore.ai` or another approved equivalent.
-2. Capture final same-run public-browser microphone proof on the canonical `main` build.
-3. Finish WhatsApp Voice Fabric integration with AssemblyAI provider selection and local Whisper fallback without creating a second app/channel.
-4. Capture final screenshots, architecture media, demo video, write-up and lablab.ai submission.
-5. Re-run full tests after any remaining release changes before merge to `main`.
+Technical release blockers are closed:
+
+1. Judge-safe HTTPS exists at `https://voiceops.creatorcore.ai/`; the public surface intentionally remains synthetic and production-write-disabled.
+2. Live AssemblyAI + local AMD/Qwen + explicit approval + governed action evidence has been captured in the private/local stack.
+3. WhatsApp Voice Fabric is reusable platform capability with AssemblyAI routing and local Whisper fallback.
+4. The maintained VoiceOps product advanced after this submission repo in `Rafa-Innerchispa/inneros-voiceops`; FieldOps verbal approval is integrated in `Rafa-Innerchispa/inneros-fieldops-agents-for-humans`.
+5. Exact final release-tree verification on 2026-09-22 is 101/101 tests PASS, compileall PASS, diff-check PASS, plus a committed-secret regression scan PASS.
+
+Remaining work is presentation and organizer submission only: fresh judge screenshots, demo video, cover/architecture media, optional pitch deck upload, team/project metadata verification, and final lablab.ai submit.
+
+Telephony is **owner-confirmed ready** (`READY_OWNER_CONFIRMED_E2E_CALLING`). Release work must not reconfigure or revalidate UCM routes, SIP/RTP, extensions, Zoiper, or Tailscale merely to prove the already-working path again.
 
 ## Truth policy
 

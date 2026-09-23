@@ -75,11 +75,8 @@ The bundled web demo uses `SyntheticServiceWorkflow`, therefore `production_writ
 
 All demo state is in memory. Request transcript length is bounded and default HTTP access logging is suppressed to reduce accidental transcript leakage.
 
-## Remaining live work
+## Current release boundary
 
-The current web product is demonstrable and test-covered. The remaining provider-level integrations are:
+The judge web product is demonstrable, test-covered, and deployed at `https://voiceops.creatorcore.ai/`. That public surface remains intentionally synthetic and production-write-disabled.
 
-1. inject a valid AssemblyAI credential server-side;
-2. feed live AssemblyAI final turns into the same `VoiceGateway` session used by this UI;
-3. expose local TTS output through the existing InnerOS XTTS/Piper capability;
-4. deploy the web server behind an approved public demo route.
+Live AssemblyAI, local AMD/Qwen reasoning, conversational TTS and governed verbal approval have been validated in the private/maintained VoiceOps stack. They are not exposed as production controls from the public hackathon service. Final remaining work is media capture and organizer submission, not another provider integration.

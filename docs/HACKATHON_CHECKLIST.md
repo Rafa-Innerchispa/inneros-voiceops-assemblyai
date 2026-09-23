@@ -1,6 +1,6 @@
 # Hackathon Checklist
 
-Last verified: 2026-09-13 GYT
+Last verified: 2026-09-22 America/Los_Angeles
 
 Legend:
 - `[x]` verified, implemented, or backed by captured runtime evidence.
@@ -56,14 +56,17 @@ Legend:
 - [x] Architecture doc present.
 - [x] Demo script present.
 - [x] Live runbook present.
-- [x] Automated local test suite passes: **60/60** on final technical verification.
+- [x] Automated local test suite passes: **101/101** on the final reconciled release tree.
 - [x] `python3 -m compileall -q src tests` passes.
 - [x] `git diff --check` passes.
 - [x] Canonical runtime workspace was rehydrated and verified at exact GitHub SHA `50fea125b3b19ede3f228a3263d5af3eef3aa132` before final release packaging.
 - [x] GitHub CI workflow added for Python 3.11/3.12.
 - [x] Release-packaging PR #9 CI completed successfully.
 - [x] Final release merge recorded: `05887f268c90e3c5d649d5d045a9835cdaf6d372`.
-- [x] Current canonical `main` advanced safely through telephony integration and is `461711617d4eb37fa848eefba9039bda1fde641f` as of 2026-09-13.
+- [x] Current canonical `main` verified at `30cd14c6113c71a23d353fb2791191244af78120` before this final reconciliation.
+- [x] Maintained VoiceOps product lineage confirmed at `Rafa-Innerchispa/inneros-voiceops` SHA `8d9df1872541619f94ca1879d27ed7311b0850f2`.
+- [x] Governed VoiceOps -> FieldOps verbal-approval bridge confirmed at `Rafa-Innerchispa/inneros-fieldops-agents-for-humans` SHA `295581e5b8932ff2713483c79beaf24e3adb84a2`.
+- [x] Telephony state is owner-confirmed `READY_OWNER_CONFIRMED_E2E_CALLING`; no UCM/SIP/RTP/route/Tailscale mutation is required for release.
 
 ## Public deployment
 - [x] Canonical public URL exists: `https://voiceops.creatorcore.ai/`.
@@ -101,7 +104,7 @@ Legend:
 - [x] AssemblyAI global provider preflight PASS with Owner Vault auth.
 - [x] Public claims/truth boundaries documented in `evidence/FINAL_RELEASE_20260912.md`.
 - [x] CI checks green on the final release-packaging PR.
-- [ ] Secret scan over the exact final release tree.
+- [x] Bounded committed-secret regression scan over the exact release tree PASS.
 - [ ] Fresh judge screenshots + browser-microphone recording for media.
 - [ ] Verify organizer's exact closing hour immediately before submission.
 - [ ] Submit before the internal freeze: **2026-09-29 22:00 America/Guayaquil**.
@@ -110,11 +113,9 @@ Legend:
 
 The technical product core is **submission-ready**. Release packaging and CI are closed. Remaining P0 work is final release hygiene, media, and organizer submission:
 
-1. Run the exact-final-tree secret scan and preserve sanitized evidence.
-2. Re-run CI/tests against the current canonical `main` after telephony integration.
-3. Capture judge screenshots and a fresh browser-microphone demo recording.
-4. Upload video/deck/media and insert their URLs into the submission package.
-5. Verify team/project metadata and the organizer's exact closing hour.
-6. Submit on lablab.ai before the internal September 29 freeze.
+1. Capture judge screenshots and a fresh browser-microphone demo recording.
+2. Upload video/deck/media and insert their URLs into the submission package.
+3. Verify team/project metadata and the organizer's exact closing hour.
+4. Submit on lablab.ai before the internal September 29 freeze.
 
 Do not fork, rebuild, or revive historical VoiceOps branches to accomplish these steps.

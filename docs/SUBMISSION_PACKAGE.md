@@ -48,6 +48,14 @@ VoiceOps does not equate a tool call with permission. It creates a cryptographic
 
 Video and pitch-deck URLs should be inserted here after media upload; do not invent placeholders in the final organizer form.
 
+## Maintained product lineage after the hackathon build
+
+The submission repository remains the public hackathon artifact. Reusable product work continued in the maintained repositories rather than turning the contest branch into a second product:
+
+- `Rafa-Innerchispa/inneros-voiceops` at `8d9df1872541619f94ca1879d27ed7311b0850f2`: conversational AssemblyAI runtime fails closed unless the SDK and server-side credential are available; the maintained runtime includes the SIP/RTP conversational transport.
+- `Rafa-Innerchispa/inneros-fieldops-agents-for-humans` at `295581e5b8932ff2713483c79beaf24e3adb84a2`: VoiceOps verbal approval enters the normal FieldOps governance path and independent verifier; an invalid approval artifact fails closed.
+- Owner-confirmed telephony state: `READY_OWNER_CONFIRMED_E2E_CALLING`. The release process deliberately does not reconfigure UCM/SIP/RTP/routes/Tailscale to re-prove an already working path.
+
 ## Judge flow
 
 1. Open the public demo.
@@ -102,6 +110,8 @@ The result is a voice agent designed not just to answer, but to act safely, loca
 ## Submission status
 
 Technical build: **ready**.
+
+Release verification refreshed on 2026-09-22: **101/101 tests PASS**, `compileall` PASS, `git diff --check` PASS, bounded committed-secret regression scan PASS, no telephony mutation, no external model spend.
 
 Still manual before organizer submission:
 

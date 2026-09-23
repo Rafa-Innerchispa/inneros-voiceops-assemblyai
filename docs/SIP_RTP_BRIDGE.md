@@ -114,5 +114,10 @@ No SIP/RTP public port-forward was added.
 - Live internal physical ringing: PASS
 - RTP/G.711 codec and packet bridge: unit-tested
 - AssemblyAI PCM16 boundary: unit-tested
-- Live bidirectional RTP through the UCM: pending bounded live media validation
-- Live PSTN call: pending explicit owner-approved destination and final media validation
+- Live bidirectional RTP through the UCM: **owner-confirmed PASS in maintained VoiceOps runtime**
+- End-to-end outbound calling: **owner-confirmed PASS** (`READY_OWNER_CONFIRMED_E2E_CALLING`)
+- DTMF: **owner-confirmed PASS**
+- Public SIP/RTP exposure: **disabled**
+- Autonomous PSTN calling: **disabled**
+
+Release note: this owner-confirmed calling state was obtained after the original bridge checkpoint and is carried forward as product evidence. Final hackathon packaging must not mutate UCM routes, SIP/RTP settings, extensions, Zoiper, or Tailscale merely to re-prove it.
