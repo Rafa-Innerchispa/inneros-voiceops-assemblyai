@@ -35,7 +35,7 @@
           <div>
             <div class="breadcrumb"><span>InnerOS</span><span>/</span><strong>VoiceOps</strong></div>
             <h1>Governed voice execution</h1>
-            <p>Speak an intent. InnerOS turns it into controlled execution and proves what happened.</p>
+            <p>Speak. Recall. Decide. Approve. Act. Verify. Remember. AssemblyAI is the realtime voice layer; InnerOS governs what happens next.</p>
           </div>
           <div class="header-meta">
             <div class="meta-kicker">ASSEMBLYAI VOICE AGENT HACKATHON</div>
@@ -76,6 +76,45 @@
             <span class="capability">Short-lived token</span>
           </div>
           <div id="agentTranscript" class="agent-transcript">Agent voice transcript will appear here during a live session.</div>
+        </section>
+
+        <section class="card memory-strip" aria-label="Shared operational memory">
+          <div class="memory-head">
+            <div>
+              <div class="step-label">SHARED OPERATIONAL MEMORY</div>
+              <strong>VOICE → MEMORY → REASON → APPROVE → ACT → VERIFY → SHARE</strong>
+            </div>
+            <span class="memory-note">Personal Brain / Cognee in live-local mode · truth-labeled judge-safe memory in public mode</span>
+          </div>
+          <div class="cognitive-loop" aria-label="Cognitive execution loop">
+            <span id="flowVoice" class="flow-step">VOICE</span>
+            <span id="flowMemory" class="flow-step">MEMORY</span>
+            <span id="flowReason" class="flow-step">REASON</span>
+            <span id="flowApprove" class="flow-step">APPROVE</span>
+            <span id="flowAct" class="flow-step">ACT</span>
+            <span id="flowVerify" class="flow-step">VERIFY</span>
+            <span id="flowShare" class="flow-step">SHARE</span>
+          </div>
+          <div class="memory-proof-grid">
+            <div class="memory-proof">
+              <div class="memory-proof-head">
+                <span>BEFORE ACTION · RECALL</span>
+                <span id="memoryBeforeTruth" class="state">WAITING</span>
+              </div>
+              <div class="metric"><span>Provider</span><strong id="memoryBeforeProvider">—</strong></div>
+              <div class="metric"><span>Hits</span><strong id="memoryBeforeCount">—</strong></div>
+              <div id="memoryBeforeSummary" class="memory-summary">No prior operational memory recalled yet.</div>
+            </div>
+            <div class="memory-proof">
+              <div class="memory-proof-head">
+                <span>AFTER ACTION · VERIFIED WRITEBACK</span>
+                <span id="memoryAfterTruth" class="state">WAITING</span>
+              </div>
+              <div class="metric"><span>Provider</span><strong id="memoryAfterProvider">—</strong></div>
+              <div class="metric"><span>Cross-agent recall</span><strong id="memoryAfterCount">—</strong></div>
+              <div id="memoryAfterSummary" class="memory-summary">A verified outcome will be stored only after explicit approval and recorded execution.</div>
+            </div>
+          </div>
         </section>
 
         <section class="grid execution-grid">

@@ -11,9 +11,9 @@
 <!-- INNEROS-NARRATIVE:END -->
 
 
-> **Speak an intent. InnerOS turns it into governed execution and proves what happened.**
+> **Speak. Recall. Decide. Approve. Act. Verify. Remember.**
 
-InnerOS VoiceOps is a local-first voice control plane for service operations and physical-world workflows. AssemblyAI provides realtime speech understanding; InnerOS provides context, routing, policy, approval, execution, and evidence.
+InnerOS VoiceOps is a local-first voice control plane for service operations and physical-world workflows. AssemblyAI provides realtime speech understanding; InnerOS provides context, shared operational memory, routing, policy, approval, execution, verification, and evidence. Verified outcomes can be curated into the same Personal Brain/Cognee memory fabric used by other agents.
 
 This is the canonical hackathon repository for the **AssemblyAI Voice Agent Hackathon 2026** on lablab.ai.
 
@@ -45,6 +45,7 @@ AssemblyAI realtime STT
     v
 InnerOS Voice Gateway
     |
+    +--> recall prior verified outcome (Personal Brain / Cognee)
     +--> context / policy / tenant
     +--> Resource Fabric routing
     |      |
@@ -64,7 +65,10 @@ Action execution
 Audit evidence + replay + HTR
     |
     v
-Human-readable completion result
+Curated verified outcome -> shared operational memory
+    |
+    v
+Cross-agent recall + human-readable completion result
 ```
 
 ## Demo story
@@ -82,7 +86,9 @@ VoiceOps should:
 5. require explicit verbal approval before the consequential step;
 6. create a **synthetic/demo work order**;
 7. expose routing, decision, approval, action, replay, and HTR evidence;
-8. report completion.
+8. report completion;
+9. curate the verified outcome into shared operational memory;
+10. prove that a second agent can recall the same correlation-bound outcome.
 
 The public demo must never require customer PII, production credentials, or destructive actions.
 
@@ -101,7 +107,7 @@ The public demo must never require customer PII, production credentials, or dest
 | Judge-facing one-screen UI | ✅ Implemented | Synthetic mode clearly labeled |
 | Resource Fabric local-first route | ✅ Verified | `local-amd-5` selected |
 | AMD .5 live bounded inference | ✅ Verified separately | Qwen on local vLLM; external fallback false |
-| Automated tests | ✅ **101/101 PASS** | Final reconciled release tree, 2026-09-22 |
+| Automated tests | ✅ **107/107 PASS** | Shared-memory submission branch verification, 2026-09-22/23 |
 | `compileall` | ✅ PASS | `src` + `tests`, 2026-09-22 |
 | `git diff --check` | ✅ PASS | 2026-09-22 |
 | Live AssemblyAI provider session | ✅ Verified | Captured in the private/local live stack; public demo remains intentionally synthetic |
@@ -109,6 +115,8 @@ The public demo must never require customer PII, production credentials, or dest
 | Public judge URL | ✅ Deployed | `https://voiceops.creatorcore.ai/` |
 | Maintained VoiceOps product | ✅ Advanced after hackathon branch | `Rafa-Innerchispa/inneros-voiceops` |
 | Governed FieldOps verbal-approval bridge | ✅ Integrated | `Rafa-Innerchispa/inneros-fieldops-agents-for-humans` |
+| Shared operational memory bridge | ✅ Implemented | Personal Brain/Cognee live-local; truth-labeled synthetic fallback for public judging |
+| Cross-agent recall | ✅ Test-covered | Verified outcome can be recalled by correlation ID after writeback |
 | Pitch deck / demo video / final organizer submit | ⏳ Pending | Presentation / organizer packaging only |
 
 ### Important live truth boundary
@@ -182,7 +190,20 @@ VoiceOps owns speech, turn handling, approval semantics, voice-to-capability rou
 
 Service Operations owns the real work-order lifecycle.
 
+Personal Brain owns the curated shared-memory/Cognee surface. VoiceOps can send only a bounded verified outcome over a loopback-only contract; raw transcripts, credentials, customer payloads and private infrastructure details are excluded.
+
 The hackathon demo binds these boundaries through safe/synthetic adapters rather than copying domain logic into this repository.
+
+
+## Shared operational memory
+
+VoiceOps now demonstrates a bounded memory cycle around governed execution:
+
+`Voice -> Recall -> Reason -> Approval -> Action -> Verify -> Remember -> Cross-agent recall`
+
+The public judge surface defaults to a deterministic **SYNTHETIC** memory lane so the demo never pretends that Cloud Run can reach the private Cognee runtime. In the live-local stack, set `VOICEOPS_SHARED_MEMORY_MODE=live` and `PERSONAL_BRAIN_URL=http://127.0.0.1:8230`; VoiceOps then uses Personal Brain's loopback-only verified-outcome endpoints backed by its configured Cognee memory adapter.
+
+Memory is context, never authorization. A remembered outcome cannot satisfy an approval gate, create an execution permit, or mark an action verified.
 
 ## Quick start
 

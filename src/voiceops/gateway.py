@@ -80,7 +80,12 @@ class VoiceGateway:
         )
         return turn
 
-    def process_final_transcript(self, transcript: str) -> dict[str, object]:
+    def process_final_transcript(
+        self,
+        transcript: str,
+        *,
+        shared_memory_context: dict[str, object] | None = None,
+    ) -> dict[str, object]:
         turn = self._new_turn(transcript)
 
         if self._pending_proposal is not None:
@@ -183,6 +188,17 @@ class VoiceGateway:
             }
 
         facts = self.workflow.inspect()
+        if shared_memory_context:
+            facts = dict(facts)
+            facts["shared_memory_context"] = shared_memory_context
+            self.evidence.add_event(
+                "shared_memory_recalled",
+                status=shared_memory_context.get("status"),
+                truth=shared_memory_context.get("truth"),
+                provider=shared_memory_context.get("provider"),
+                hit_count=shared_memory_context.get("count", 0),
+                raw_private_memory_exposed=False,
+            )
         self.evidence.add_event("state_snapshot", snapshot=facts)
         reasoning = self.reasoner.propose(facts)
         proposal = reasoning.proposal

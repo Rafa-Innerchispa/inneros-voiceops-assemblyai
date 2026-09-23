@@ -1,61 +1,90 @@
-# Canonical Demo Script
+# Canonical Demo Script — Voice + Shared Operational Memory
 
 ## Goal
 
-Demonstrate one voice request becoming governed execution with visible evidence and measurable Human Time Returned.
+Demonstrate a realtime AssemblyAI voice request that can recall prior operational context, become governed execution, require explicit approval, produce replayable evidence, and write only the **verified outcome** back into shared agent memory.
+
+## One-line story
+
+**The voice agent remembers what happened, knows what it is allowed to do, acts only with explicit approval, and proves the result to the next agent.**
 
 ## Scene
 
-Synthetic technical-services/building environment. No real customer or security data.
+Synthetic technical-services/building environment for the public judge surface. No customer data, production credentials, or destructive actions. The recorded live-local proof may use Personal Brain/Cognee and local AMD/Qwen while preserving the same truth labels.
 
-## Conversation
+## 90-second judge flow
 
-**User:** “Ralphi, tenemos una alarma en el acceso norte. Revisa qué ocurre y abre una orden para el técnico si corresponde.”
+### 0–12 s · Voice
 
-VoiceOps should:
+**User:** “Ralphi, review the north access incident and create a technical work order if appropriate.”
 
-1. show realtime AssemblyAI transcription;
-2. resolve the synthetic site/asset context;
-3. inspect demo alarm/device state;
-4. explain the detected issue briefly;
-5. propose the appropriate operational action;
-6. request explicit approval.
+AssemblyAI supplies the realtime voice layer. The UI marks **VOICE** complete.
 
-**VoiceOps:** “Detecté pérdida de señal en la cámara del acceso norte. Puedo crear una orden prioritaria y asignarla al técnico disponible. ¿Autorizas?”
+### 12–25 s · Recall + reason
 
-**User:** “Sí, autoriza y avísame cuando quede creada.”
+VoiceOps queries shared operational memory before reasoning.
 
-VoiceOps should:
+- public judge mode: truth-labeled `SYNTHETIC` memory;
+- live-local mode: Personal Brain / Cognee returns `LIVE` curated memory.
 
-7. capture approval evidence;
-8. execute the synthetic work-order action;
-9. capture result evidence;
-10. calculate/show HTR;
-11. expose Decision Evidence / Routing Evidence / replay reference;
-12. answer by voice.
+The UI shows the provider, truth class, hit count and one bounded memory summary. The reasoner receives that context, but memory cannot authorize anything.
 
-**VoiceOps:** concise completion response with work-order identifier and evidence status.
+### 25–38 s · Proposal
 
-## What the judge sees
+VoiceOps proposes the bounded work-order action and stops at the approval gate.
 
-- live transcript;
-- current VoiceOps state;
-- local-first routing decision;
-- proposed action;
-- approval event;
-- tool execution;
-- result;
-- HTR metric;
-- audit/evidence link.
+**VoiceOps:** “I found a prior related operational outcome and the current north-access incident requires follow-up. I can create a bounded technical work order. Do you authorize it?”
+
+### 38–48 s · Ambiguity fails closed
+
+**User:** “If you think it is necessary.”
+
+Expected result: **BLOCKED**. No permit, no action, no memory writeback.
+
+### 48–62 s · Explicit approval
+
+**User:** “Yes, I authorize it.”
+
+VoiceOps creates the short-lived, single-use execution permit bound to session, event, exact approval transcript, proposal and state.
+
+### 62–75 s · Action + evidence
+
+The judge-safe synthetic work order is created. Decision Evidence / Replay / HTR update.
+
+### 75–90 s · Remember + cross-agent proof
+
+Only now does VoiceOps create a bounded verified-outcome record. The record excludes the raw transcript and private infrastructure details.
+
+The UI shows:
+
+`VERIFIED WRITEBACK -> memory receipt -> CROSS-AGENT RECALL`
+
+A second recall by correlation ID proves the stored outcome can be retrieved from the shared memory lane.
+
+## What the judge should notice
+
+- AssemblyAI is visibly the voice front door.
+- Memory is consulted **before** reasoning but never bypasses approval.
+- Ambiguous authorization fails closed.
+- The execution permit is single-use.
+- The outcome is remembered **after** verification, not before.
+- The same outcome is recallable by another agent.
+- Every memory/provider state carries a truth label such as `LIVE`, `REPLAY`, `SYNTHETIC`, or `UNVERIFIED`.
+
+## Boson boundary
+
+Boson/Higgs work from the separate September 18 prototype proves VoiceOps can support another speech provider, but it is not part of the judged primary path here. AssemblyAI remains the hackathon voice technology.
 
 ## Demo fallback
 
-If live microphone/browser permissions fail, provide a deterministic synthetic audio fixture that runs the exact same backend workflow. The fallback must still use AssemblyAI and must be labeled as prerecorded test input, not live speech.
+If browser microphone permissions fail, use the deterministic fixture button. The public fallback remains visibly synthetic. Do not describe synthetic memory or synthetic work-order execution as production/live.
 
 ## Forbidden shortcuts
 
+- fake live Cognee claims from the public Cloud Run surface;
+- treating remembered text as authorization;
+- storing raw approval transcripts in shared memory;
 - fake tool results presented as production results;
 - hidden manual clicks that actually perform the workflow;
 - precomputed HTR labeled MEASURED without evidence;
-- a prerecorded video as the only functional prototype;
-- production customer/security data.
+- customer/security data.

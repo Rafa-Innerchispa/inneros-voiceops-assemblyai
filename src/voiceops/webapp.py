@@ -16,6 +16,7 @@ from urllib.request import Request, urlopen
 from .adapters.local_amd import LocalAMDReasoner
 from .audit import replay_summary
 from .gateway import VoiceGateway
+from .shared_memory import SharedMemoryBridge
 
 
 MAX_BODY_BYTES = 16_384
@@ -39,16 +40,27 @@ def _env_truthy(name: str, default: bool = False) -> bool:
 class DemoSessionStore:
     """Thread-safe in-memory state for the judge-facing demo."""
 
-    def __init__(self, gateway_factory: Callable[[], VoiceGateway] | None = None) -> None:
+    def __init__(
+        self,
+        gateway_factory: Callable[[], VoiceGateway] | None = None,
+        memory_bridge: SharedMemoryBridge | None = None,
+    ) -> None:
         self._lock = threading.Lock()
         self._gateway_factory = gateway_factory or VoiceGateway
         self._gateway = self._gateway_factory()
+        self._memory_bridge = memory_bridge or SharedMemoryBridge()
         self._last_result: dict[str, object] | None = None
+        self._memory_recall: dict[str, object] | None = None
+        self._memory_receipt: dict[str, object] | None = None
+        self._memory_cross_agent: dict[str, object] | None = None
 
     def reset(self) -> dict[str, Any]:
         with self._lock:
             self._gateway = self._gateway_factory()
             self._last_result = None
+            self._memory_recall = None
+            self._memory_receipt = None
+            self._memory_cross_agent = None
             return self._snapshot_unlocked()
 
     def submit_transcript(self, transcript: str) -> dict[str, Any]:
@@ -59,19 +71,72 @@ class DemoSessionStore:
 
     def submit_intent(self, transcript: str) -> dict[str, Any]:
         normalized = _normalize_transcript(transcript)
+        memory_recall = self._memory_bridge.recall(normalized)
         with self._lock:
             if self._gateway.pending_approval:
                 raise ValueError("an approval is already pending")
-            self._last_result = self._gateway.process_final_transcript(normalized)
+            self._memory_recall = memory_recall
+            self._last_result = self._gateway.process_final_transcript(
+                normalized,
+                shared_memory_context=memory_recall,
+            )
             return self._snapshot_unlocked()
 
     def approve_pending(self, phrase: str) -> dict[str, Any]:
         normalized = _normalize_transcript(phrase)
+        outcome: dict[str, object] | None = None
         with self._lock:
             if not self._gateway.pending_approval:
                 raise ValueError("no action is awaiting approval")
             self._last_result = self._gateway.process_final_transcript(normalized)
-            return self._snapshot_unlocked()
+            action = self._gateway.evidence.action_result
+            approval = self._gateway.evidence.approval
+            if (
+                isinstance(self._last_result, dict)
+                and self._last_result.get("status") == "completed"
+                and action is not None
+                and approval is not None
+                and approval.approved
+            ):
+                outcome = {
+                    "correlation_id": self._gateway.evidence.correlation_id,
+                    "summary": (
+                        f"Governed demo action {action.action_type} completed as {action.action_id}; "
+                        "explicit approval and a single-use execution permit were recorded."
+                    ),
+                    "evidence_ref": (
+                        f"evidence://voiceops/{self._gateway.evidence.correlation_id}/{action.action_id}"
+                    ),
+                    "source_truth": "SYNTHETIC",
+                    "verification_passed": True,
+                }
+            state = self._snapshot_unlocked()
+
+        if outcome:
+            receipt = self._memory_bridge.remember_verified(**outcome)
+            cross_agent = self._memory_bridge.recall(str(outcome["correlation_id"]))
+            with self._lock:
+                self._memory_receipt = receipt
+                self._memory_cross_agent = cross_agent
+                self._gateway.evidence.add_event(
+                    "shared_memory_writeback",
+                    status=receipt.get("status"),
+                    truth=receipt.get("truth"),
+                    provider=receipt.get("provider"),
+                    stored=receipt.get("stored", False),
+                    memory_id=receipt.get("memory_id"),
+                    verification_passed=True,
+                    transcript_persisted=False,
+                )
+                self._gateway.evidence.add_event(
+                    "cross_agent_memory_recall",
+                    status=cross_agent.get("status"),
+                    truth=cross_agent.get("truth"),
+                    provider=cross_agent.get("provider"),
+                    hit_count=cross_agent.get("count", 0),
+                )
+                return self._snapshot_unlocked()
+        return state
 
     def snapshot(self) -> dict[str, Any]:
         with self._lock:
@@ -223,6 +288,12 @@ class DemoSessionStore:
             }
             if htr
             else None,
+            "shared_memory": {
+                "bridge": self._memory_bridge.status(),
+                "before_action": self._memory_recall,
+                "writeback": self._memory_receipt,
+                "cross_agent_recall": self._memory_cross_agent,
+            },
             "timeline": [
                 {"kind": event.kind, "at": event.at, "data": event.data}
                 for event in evidence.events
