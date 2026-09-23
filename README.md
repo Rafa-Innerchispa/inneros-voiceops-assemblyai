@@ -86,7 +86,7 @@ VoiceOps should:
 
 The public demo must never require customer PII, production credentials, or destructive actions.
 
-## Verified state — September 10, 2026
+## Verified state — September 22, 2026
 
 | Capability | State | Truth boundary |
 | --- | --- | --- |
@@ -101,20 +101,21 @@ The public demo must never require customer PII, production credentials, or dest
 | Judge-facing one-screen UI | ✅ Implemented | Synthetic mode clearly labeled |
 | Resource Fabric local-first route | ✅ Verified | `local-amd-5` selected |
 | AMD .5 live bounded inference | ✅ Verified separately | Qwen on local vLLM; external fallback false |
-| Automated tests | ✅ **35/35 PASS** | Current E2E branch, 2026-09-10 |
-| `compileall` | ✅ PASS | `src` + `tests`, 2026-09-10 |
-| `git diff --check` | ✅ PASS | 2026-09-10 |
-| Live AssemblyAI provider session | ⏳ Pending | Requires server-side API key injection |
-| Controlled WAV live E2E | ⏳ Pending | Do not claim until captured |
-| Microphone live E2E | ⏳ Pending | Do not claim until captured |
-| Public judge URL | ⏳ Pending | Deployment step |
-| Pitch deck / demo video / final submission | ⏳ Pending | Packaging step |
+| Automated tests | ✅ **101/101 PASS** | Final reconciled release tree, 2026-09-22 |
+| `compileall` | ✅ PASS | `src` + `tests`, 2026-09-22 |
+| `git diff --check` | ✅ PASS | 2026-09-22 |
+| Live AssemblyAI provider session | ✅ Verified | Captured in the private/local live stack; public demo remains intentionally synthetic |
+| Voice-to-governed-action E2E | ✅ Verified | AssemblyAI -> InnerOS -> local AMD/Qwen -> verbal approval -> action -> Evidence/Replay |
+| Public judge URL | ✅ Deployed | `https://voiceops.creatorcore.ai/` |
+| Maintained VoiceOps product | ✅ Advanced after hackathon branch | `Rafa-Innerchispa/inneros-voiceops` |
+| Governed FieldOps verbal-approval bridge | ✅ Integrated | `Rafa-Innerchispa/inneros-fieldops-agents-for-humans` |
+| Pitch deck / demo video / final organizer submit | ⏳ Pending | Presentation / organizer packaging only |
 
 ### Important live truth boundary
 
-The repository does **not** yet claim a complete live microphone → AssemblyAI → AMD .5 → approval → action run.
+The private/local stack has captured the live AssemblyAI -> InnerOS -> AMD .5 -> explicit approval -> governed action -> evidence loop. The public judge service deliberately remains a synthetic, production-write-disabled surface; it must not be described as using the private AMD runtime or as exposing production telephony/building controls.
 
-That claim becomes valid only after a real AssemblyAI v3 session is executed with a server-side `ASSEMBLYAI_API_KEY` and sanitized evidence captures the provider session, termination, transcript, route, approval/action result, and latencies from the same run.
+The maintained VoiceOps product later completed the conversational SIP/RTP runtime and owner-confirmed end-to-end calling. That product-lineage work lives in `Rafa-Innerchispa/inneros-voiceops`; it is referenced here as post-hackathon evolution, not misrepresented as code contained in this submission repository.
 
 No API key may be committed, printed, copied into screenshots, or stored in public evidence.
 
@@ -300,18 +301,19 @@ evidence/                  Sanitized checkpoints and measured evidence
 
 ## Definition of done
 
-The technical core is substantially implemented. Final submission still requires:
+The technical core is submission-ready. Final organizer closure now requires only:
 
-- [ ] one real AssemblyAI controlled-WAV E2E run;
-- [ ] one real microphone E2E run;
-- [ ] same-run latency and provider-session evidence;
-- [ ] clean-clone verification;
-- [ ] final release/merge SHA;
-- [ ] public judge-safe URL;
+- [x] live AssemblyAI / governed-action evidence;
+- [x] exact-current-tree automated verification;
+- [x] bounded committed-secret regression scan;
+- [x] public judge-safe URL;
+- [x] final submission copy and judge instructions;
 - [ ] cover / architecture media;
-- [ ] pitch deck;
+- [ ] fresh judge screenshots;
 - [ ] demo video;
-- [ ] submission copy and final lablab.ai submission.
+- [ ] pitch deck/media upload if accepted by the organizer form;
+- [ ] verify team/project attachment on lablab.ai;
+- [ ] final lablab.ai submission.
 
 The canonical detailed checklist is `docs/HACKATHON_CHECKLIST.md`.
 
