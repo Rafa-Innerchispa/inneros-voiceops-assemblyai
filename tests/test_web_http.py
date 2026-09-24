@@ -40,6 +40,9 @@ def test_http_server_serves_ui_and_governed_api_flow() -> None:
         assert health["service"] == "inneros-voiceops"
         assert health["production_writes"] is False
 
+        cloud_health = _get_json(base + "/health")
+        assert cloud_health == health
+
         initial = _get_json(base + "/api/state")
         assert initial["production_writes"] is False
 

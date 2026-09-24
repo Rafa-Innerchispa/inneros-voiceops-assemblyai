@@ -362,7 +362,7 @@ class VoiceOpsHandler(BaseHTTPRequestHandler):
         return
 
     def do_GET(self) -> None:  # noqa: N802
-        if self.path == "/healthz":
+        if self.path in {"/health", "/healthz"}:
             self._send_json(
                 {
                     "ok": True,
