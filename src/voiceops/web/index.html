@@ -3,11 +3,15 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#090f1a">
-  <title>InnerOS VoiceOps</title>
+  <meta name="theme-color" content="#09090b">
+  <meta name="description" content="InnerOS VoiceOps turns AssemblyAI realtime voice into governed, verifiable action.">
+  <title>InnerOS VoiceOps | Voice actions with proof</title>
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
+  <div class="ambient ambient-a" aria-hidden="true"></div>
+  <div class="ambient ambient-b" aria-hidden="true"></div>
+
   <div class="app-frame">
     <aside class="app-rail" aria-label="InnerOS application rail">
       <div class="rail-brand" title="InnerOS">
@@ -32,33 +36,94 @@
     <main class="workspace">
       <div class="shell">
         <header class="topbar">
-          <div>
-            <div class="breadcrumb"><span>InnerOS</span><span>/</span><strong>VoiceOps</strong></div>
-            <h1>Governed voice execution</h1>
-            <p>Speak. Recall. Decide. Approve. Act. Verify. Remember. AssemblyAI is the realtime voice layer; InnerOS governs what happens next.</p>
+          <div class="brandline">
+            <div class="breadcrumb"><span>INNEROS</span><span>/</span><strong>VOICEOPS</strong></div>
+            <span class="event-chip">ASSEMBLYAI VOICE AGENT HACKATHON · 2026</span>
           </div>
-          <div class="header-meta">
-            <div class="meta-kicker">ASSEMBLYAI VOICE AGENT HACKATHON</div>
-            <div class="badges">
-              <span class="badge badge-local"><span class="badge-dot"></span>LOCAL-FIRST</span>
-              <span class="badge">DEMO ENVIRONMENT</span>
-              <span class="badge">NO PROD WRITES</span>
-            </div>
+          <div class="badges">
+            <span class="badge badge-local"><span class="badge-dot"></span>LOCAL-FIRST</span>
+            <span class="badge">JUDGE SAFE</span>
+            <span class="badge">NO PROD WRITES</span>
           </div>
         </header>
 
-        <section id="execution" class="controls card">
-          <div>
-            <div class="step-label">EXECUTION CONTROL</div>
-            <div id="demoStatus" class="status-line">Ready for an operational intent.</div>
+        <section class="hero">
+          <div class="hero-copy">
+            <div class="hero-kicker">VOICE → GOVERNED EXECUTION → PROOF</div>
+            <h1>Talk is cheap.<br><span>Actions need receipts.</span></h1>
+            <p class="hero-lede">AssemblyAI hears the operator in realtime. InnerOS recalls verified context, reasons, asks for explicit approval, mints a one-time execution permit, acts, verifies the result and remembers only what was proven.</p>
+
+            <div class="hero-trust" aria-label="Verified project facts">
+              <div class="trust-item"><strong>108/108</strong><span>tests passing</span></div>
+              <div class="trust-item"><strong>1×</strong><span>single-use permit</span></div>
+              <div class="trust-item"><strong>0</strong><span>production writes</span></div>
+              <div class="trust-item"><strong>LOCAL</strong><span>reasoning preferred</span></div>
+            </div>
+
+            <div id="execution" class="hero-controls">
+              <div class="status-cluster">
+                <div class="step-label">EXECUTION CONTROL</div>
+                <div id="demoStatus" class="status-line">Ready for an operational intent.</div>
+              </div>
+              <div class="control-row">
+                <button id="liveVoiceBtn" class="primary"><span class="button-icon">●</span> Start live voice</button>
+                <button id="stopVoiceBtn" class="ghost" disabled>Stop</button>
+                <button id="runBtn" class="secondary">Run judge-safe demo</button>
+                <button id="approveBtn" class="approve" disabled>Yes, authorize</button>
+                <button id="ambiguousBtn" class="secondary" disabled>Try ambiguity</button>
+                <button id="resetBtn" class="ghost">Reset</button>
+              </div>
+            </div>
           </div>
-          <div class="control-row">
-            <button id="liveVoiceBtn" class="primary"><span class="button-icon">●</span> Start live voice</button>
-            <button id="stopVoiceBtn" class="ghost" disabled>Stop voice</button>
-            <button id="runBtn" class="secondary">Run fixture</button>
-            <button id="approveBtn" class="approve" disabled>Yes, authorize</button>
-            <button id="ambiguousBtn" class="secondary" disabled>Ambiguous approval</button>
-            <button id="resetBtn" class="ghost">Reset</button>
+
+          <div class="hero-stage" aria-label="VoiceOps proof-chain visualization">
+            <div class="stage-grid" aria-hidden="true"></div>
+            <div class="orbit orbit-1" aria-hidden="true"></div>
+            <div class="orbit orbit-2" aria-hidden="true"></div>
+            <div class="orbit orbit-3" aria-hidden="true"></div>
+
+            <div class="signal-core">
+              <div class="core-wave" aria-hidden="true">
+                <i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+              </div>
+              <span>INNEROS</span>
+              <strong>VOICEOPS</strong>
+              <small>PROOF-BACKED ACTION</small>
+            </div>
+
+            <div class="orbit-node node-aai">
+              <span>01</span>
+              <strong>ASSEMBLYAI</strong>
+              <small>realtime voice</small>
+            </div>
+            <div class="orbit-node node-memory">
+              <span>02</span>
+              <strong>RECALL</strong>
+              <small>verified context</small>
+            </div>
+            <div class="orbit-node node-reason">
+              <span>03</span>
+              <strong>REASON</strong>
+              <small>local-first</small>
+            </div>
+            <div class="orbit-node node-permit">
+              <span>04</span>
+              <strong>PERMIT</strong>
+              <small>explicit approval</small>
+            </div>
+            <div class="orbit-node node-proof">
+              <span>05</span>
+              <strong>PROOF</strong>
+              <small>verify + replay</small>
+            </div>
+
+            <div class="stage-caption">
+              <span class="stage-dot"></span>
+              <div>
+                <strong>Every action leaves a proof chain</strong>
+                <small>Speech is evidence. Memory is context. Approval is authorization.</small>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -69,6 +134,7 @@
           </div>
           <div class="capability-row">
             <span class="capability">Voice Agent API</span>
+            <span class="capability">Realtime STT</span>
             <span class="capability">Neural turn detection</span>
             <span class="capability">Barge-in</span>
             <span class="capability">Native TTS</span>
@@ -78,27 +144,29 @@
           <div id="agentTranscript" class="agent-transcript">Agent voice transcript will appear here during a live session.</div>
         </section>
 
-        <section class="card memory-strip" aria-label="Shared operational memory">
-          <div class="memory-head">
+        <section class="proof-chain card" aria-label="Governed execution proof chain">
+          <div class="section-head">
             <div>
-              <div class="step-label">SHARED OPERATIONAL MEMORY</div>
-              <strong>VOICE → MEMORY → REASON → APPROVE → ACT → VERIFY → SHARE</strong>
+              <div class="step-label">THE PROOF CHAIN</div>
+              <h2>One spoken request. Seven observable states.</h2>
             </div>
-            <span class="memory-note">Personal Brain / Cognee in live-local mode · truth-labeled judge-safe memory in public mode</span>
+            <div class="section-note">The judge can watch authorization and evidence evolve instead of trusting a black-box tool call. Personal Brain / Cognee is used for verified shared operational memory in the live-local path.</div>
           </div>
+
           <div class="cognitive-loop" aria-label="Cognitive execution loop">
-            <span id="flowVoice" class="flow-step">VOICE</span>
-            <span id="flowMemory" class="flow-step">MEMORY</span>
-            <span id="flowReason" class="flow-step">REASON</span>
-            <span id="flowApprove" class="flow-step">APPROVE</span>
-            <span id="flowAct" class="flow-step">ACT</span>
-            <span id="flowVerify" class="flow-step">VERIFY</span>
-            <span id="flowShare" class="flow-step">SHARE</span>
+            <span id="flowVoice" class="flow-step"><b>01</b>VOICE</span>
+            <span id="flowMemory" class="flow-step"><b>02</b>RECALL</span>
+            <span id="flowReason" class="flow-step"><b>03</b>REASON</span>
+            <span id="flowApprove" class="flow-step"><b>04</b>PERMIT</span>
+            <span id="flowAct" class="flow-step"><b>05</b>ACT</span>
+            <span id="flowVerify" class="flow-step"><b>06</b>VERIFY</span>
+            <span id="flowShare" class="flow-step"><b>07</b>REMEMBER</span>
           </div>
+
           <div class="memory-proof-grid">
             <div class="memory-proof">
               <div class="memory-proof-head">
-                <span>BEFORE ACTION · RECALL</span>
+                <span>BEFORE ACTION · VERIFIED CONTEXT RECALL</span>
                 <span id="memoryBeforeTruth" class="state">WAITING</span>
               </div>
               <div class="metric"><span>Provider</span><strong id="memoryBeforeProvider">—</strong></div>
@@ -107,23 +175,23 @@
             </div>
             <div class="memory-proof">
               <div class="memory-proof-head">
-                <span>AFTER ACTION · VERIFIED WRITEBACK</span>
+                <span>AFTER ACTION · VERIFIED OUTCOME ONLY</span>
                 <span id="memoryAfterTruth" class="state">WAITING</span>
               </div>
               <div class="metric"><span>Provider</span><strong id="memoryAfterProvider">—</strong></div>
               <div class="metric"><span>Cross-agent recall</span><strong id="memoryAfterCount">—</strong></div>
-              <div id="memoryAfterSummary" class="memory-summary">A verified outcome will be stored only after explicit approval and recorded execution.</div>
+              <div id="memoryAfterSummary" class="memory-summary">A verified outcome is stored only after explicit approval and recorded execution.</div>
             </div>
           </div>
         </section>
 
         <section class="grid execution-grid">
-          <article class="card panel">
-            <div class="step-label">01 · VOICE</div>
+          <article class="card panel panel-voice">
+            <div class="step-label">01 · HEARD</div>
             <div class="panel-head">
               <div class="panel-title-wrap">
                 <span class="panel-icon">A</span>
-                <h2>AssemblyAI input</h2>
+                <h2>AssemblyAI voice evidence</h2>
               </div>
               <span id="voiceState" class="state">READY</span>
             </div>
@@ -134,12 +202,12 @@
             <div class="fineprint">Live mode uses AssemblyAI turn detection, partial/final transcripts, native TTS, interruption handling and governed tool calling. Fixture mode remains available for deterministic judging.</div>
           </article>
 
-          <article class="card panel">
-            <div class="step-label">02 · OPERATIONAL CONTEXT</div>
+          <article class="card panel panel-context">
+            <div class="step-label">02 · GROUNDED</div>
             <div class="panel-head">
               <div class="panel-title-wrap">
                 <span class="panel-icon">G</span>
-                <h2>Guardian event</h2>
+                <h2>Operational context</h2>
               </div>
               <span id="guardianState" class="state">WAITING</span>
             </div>
@@ -147,8 +215,8 @@
             <div id="guardianData" class="data-stack hidden"></div>
           </article>
 
-          <article class="card panel">
-            <div class="step-label">03 · REASONING ROUTE</div>
+          <article class="card panel panel-reason">
+            <div class="step-label">03 · DECIDED</div>
             <div class="panel-head">
               <div class="panel-title-wrap">
                 <span class="panel-icon">R</span>
@@ -163,18 +231,18 @@
             <div class="metric"><span>Evidence class</span><strong id="routeTruth">—</strong></div>
           </article>
 
-          <article class="card panel action-card">
-            <div class="step-label">04 · GOVERNED ACTION</div>
+          <article class="card panel action-card panel-action">
+            <div class="step-label">04 · AUTHORIZED</div>
             <div class="panel-head">
               <div class="panel-title-wrap">
                 <span class="panel-icon">✓</span>
-                <h2>Action gate</h2>
+                <h2>Single-use action gate</h2>
               </div>
               <span id="actionState" class="state">WAITING</span>
             </div>
             <div id="proposalEmpty" class="empty">No action proposed.</div>
             <div id="proposalData" class="data-stack hidden"></div>
-            <div id="approvalGate" class="approval-gate hidden">HUMAN APPROVAL REQUIRED</div>
+            <div id="approvalGate" class="approval-gate hidden">HUMAN APPROVAL REQUIRED · NO PERMIT YET</div>
             <div id="actionResult" class="result hidden"></div>
           </article>
         </section>
@@ -182,8 +250,9 @@
         <section id="evidence" class="card evidence-card">
           <div class="evidence-head">
             <div>
-              <div class="step-label">05 · DECISION EVIDENCE</div>
+              <div class="step-label">05 · PROVEN</div>
               <h2>Forensic execution trace</h2>
+              <p>Replay the decision from captured evidence, not from whatever the system happens to believe now.</p>
             </div>
             <div class="ids">
               <span>Session <code id="sessionId">—</code></span>
@@ -194,15 +263,23 @@
           <div class="evidence-footer">
             <div id="htrBox" class="htr">HTR appears after an approved action.</div>
             <div class="control-row">
-              <button id="evidenceBtn" class="secondary">View evidence</button>
+              <button id="evidenceBtn" class="secondary">Inspect evidence</button>
               <button id="replayBtn" class="secondary">Replay decision</button>
             </div>
           </div>
         </section>
 
+        <section class="closing-strip">
+          <div>
+            <span class="closing-kicker">VOICEOPS IN ONE LINE</span>
+            <strong>AssemblyAI hears. InnerOS governs. Evidence proves.</strong>
+          </div>
+          <span>Voice is the interface. Governed execution is the product.</span>
+        </section>
+
         <footer class="product-footer">
           <span>InnerOS VoiceOps</span>
-          <span>AssemblyAI voice layer · InnerOS governance · local-first execution</span>
+          <span>AssemblyAI realtime voice · InnerOS governance · local-first execution</span>
         </footer>
       </div>
     </main>
