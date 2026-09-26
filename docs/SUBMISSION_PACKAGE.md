@@ -6,7 +6,7 @@
 
 ## Short description
 
-AssemblyAI powers realtime voice while InnerOS recalls prior verified outcomes, requires explicit approval, executes with a single-use permit, proves the result, and shares only the verified outcome with Personal Brain/Cognee.
+AssemblyAI powers realtime voice while InnerOS recalls outcomes, requires explicit approval, executes with a single-use permit, and proves the result. VoiceOps runs on Google Cloud Run or sovereign local infrastructure with AMD/Qwen inference.
 
 ## Long description
 
@@ -18,7 +18,9 @@ Only after that permit validates can the demo action execute. Every step is capt
 
 The project is local-first. AMD .5/Qwen provides the private reasoning path in the live local stack. AssemblyAI is a reusable platform provider rather than a product-specific secret. WhatsApp voice notes use the same reusable Voice Fabric with managed AssemblyAI STT and local Whisper fallback. Physical Guardian contributes sanitized `NormalizedEvent` incidents without duplicating camera logic inside VoiceOps.
 
-For judging, the public Cloud Run surface intentionally runs a safe synthetic reasoner, synthetic memory lane, and no production writes. The live-local stack can use Personal Brain/Cognee plus AssemblyAI and AMD .5. This keeps the public demo honest while showing the architecture that matters: **Voice -> Memory -> Reason -> Approval -> Action -> Verify -> Shared Recall**.
+For judging, we expose **two real deployment profiles from the same application**. The managed profile runs on Google Cloud Run with a safe synthetic reasoner, synthetic memory lane and no production writes. The sovereign-local profile is served from our local infrastructure and routes reasoning to the local AMD/Qwen runtime while preserving the same approval, evidence and replay contract. AssemblyAI remains the realtime voice layer for the judged voice path; local sovereignty refers to application hosting, operational data boundaries and model inference rather than falsely claiming AssemblyAI itself runs offline.
+
+This dual deployment is part of the product story, not two separate demos: **Voice -> Memory -> Reason -> Approval -> Action -> Verify -> Shared Recall** behaves the same while the execution plane changes.
 
 ## What is novel
 
@@ -40,15 +42,17 @@ VoiceOps does not equate a tool call, a remembered fact, or a model recommendati
 - Decision Evidence / Forensic Replay / Human Time Returned
 - Personal Brain / Cognee shared operational memory bridge
 - truth-labeled memory states: LIVE / REPLAY / SYNTHETIC / UNVERIFIED
-- Google Cloud Run + Cloudflare public judge surface
+- Google Cloud Run managed deployment + Cloudflare custom domain
+- Sovereign local/edge deployment with AMD/Qwen local inference
 - Python 3.11/3.12
 
 ## Public links
 
 - Repository: `https://github.com/Rafa-Innerchispa/inneros-voiceops-assemblyai`
-- Demo: `https://voiceops.creatorcore.ai/`
+- Managed cloud showcase: `https://voiceops-cloud.creatorcore.ai/` — Google Cloud Run
+- Sovereign local showcase: `https://voiceops.creatorcore.ai/` — local server + AMD/Qwen reasoning
 
-Video and pitch-deck URLs should be inserted here after media upload; do not invent placeholders in the final organizer form.
+Both URLs serve the same VoiceOps governance UX and truth-label the runtime currently serving the page. Video and pitch-deck URLs should be inserted here after media upload; do not invent placeholders in the final organizer form.
 
 ## Maintained product lineage after the hackathon build
 
@@ -60,22 +64,24 @@ The submission repository remains the public hackathon artifact. Reusable produc
 
 ## Judge flow
 
-1. Open the public demo.
-2. Reset the demo state.
-3. Submit an operational intent such as: `Review the north access incident and create a technical work order if appropriate.`
-4. Observe the **BEFORE ACTION / RECALL** panel and its truth label.
-5. Observe that the system proposes an action but does not execute it.
-6. Try an ambiguous phrase such as `If you think it is necessary.` The action stays blocked and no memory write occurs.
-7. Give explicit authorization: `Yes, I authorize it.`
-8. Observe the synthetic work order, execution-permit evidence, correlation/session identifiers and HTR result.
-9. Observe **VERIFIED WRITEBACK** and **CROSS-AGENT RECALL** by correlation ID.
+1. Open the two deployment URLs side by side and show that the UI is the same while the active runtime card changes from **GOOGLE CLOUD RUN** to **SOVEREIGN LOCAL**.
+2. On the cloud surface, show the managed-service profile and judge-safe boundary.
+3. On the local surface, run the governed demo and show **AMD / Qwen local** as the inference route after the intent is processed.
+4. Submit an operational intent such as: `Review the north access incident and create a technical work order if appropriate.`
+5. Observe the **BEFORE ACTION / RECALL** panel and its truth label.
+6. Observe that the system proposes an action but does not execute it.
+7. Try an ambiguous phrase such as `If you think it is necessary.` The action stays blocked and no memory write occurs.
+8. Give explicit authorization: `Yes, I authorize it.`
+9. Observe the bounded work order, execution-permit evidence, correlation/session identifiers and HTR result.
 10. Open Evidence / Replay and inspect the chronological decision trail.
 
-The public surface has `production_writes=false`. It is intentionally judge-safe.
+Both judge surfaces keep `production_writes=false`. The cloud surface uses synthetic reasoning; the sovereign-local surface uses the verified local AMD/Qwen runtime.
 
 ## 75-second spoken pitch
 
 Voice agents are good at talking. The harder problem is remembering what really happened without confusing memory with permission to act.
+
+We also built VoiceOps so deployment is a customer choice, not an architectural fork. The same governed interface runs in Google Cloud Run for a managed service, or on sovereign local infrastructure with AMD/Qwen inference and customer-controlled operational data.
 
 InnerOS VoiceOps uses AssemblyAI as the realtime voice layer. Before reasoning, it can recall a prior verified operational outcome from shared memory. InnerOS then inspects current state and asks our local AMD/Qwen reasoning layer what should happen next. But memory and recommendations are context, not authorization.
 
@@ -85,7 +91,7 @@ Then we create the bounded demo action and preserve the entire decision as repla
 
 ## Demo recording outline
 
-- 0–10 s: problem statement and one-screen cognitive loop
+- 0–10 s: split-screen proof of Cloud Run vs Sovereign Local, same VoiceOps UI
 - 10–25 s: AssemblyAI voice request + prior memory recall
 - 25–38 s: proposal appears, ambiguous approval is rejected
 - 38–52 s: explicit approval, single-use permit, action result
@@ -95,26 +101,26 @@ Then we create the bounded demo action and preserve the entire decision as repla
 
 ## Evidence-backed claims allowed in submission
 
-- 108/108 tests PASS on the final submission branch, including LabLab field-limit checks.
+- 111/111 tests PASS on the dual-deployment submission branch, including deployment-profile and LabLab field-limit checks.
 - Explicit approval fails closed for ambiguous phrases.
 - Voice Execution Permit is bound and single-use.
-- Public judge surface is deployed and returns a working `/api/state`.
+- Managed Cloud Run and sovereign-local judge surfaces are both deployed on custom `creatorcore.ai` hostnames and return a working `/api/state`.
 - Reusable AssemblyAI provider preflight is PASS with credentials kept server-side.
-- Prior captured local live E2E includes AssemblyAI STT -> InnerOS -> AMD .5 -> approval -> synthetic action -> Evidence/Replay -> spoken completion.
+- The sovereign-local web runtime is configured for `local-amd-5` / Qwen inference; prior captured local live E2E includes AssemblyAI STT -> InnerOS -> AMD .5 -> approval -> bounded action -> Evidence/Replay -> spoken completion.
 - Reusable WhatsApp Voice Fabric has AssemblyAI routing and local Whisper fallback tests PASS.
 
 ## Claims to avoid
 
-- Do not claim the public Cloud Run revision currently uses AMD .5 or live Cognee; it runs the synthetic reasoner and should use the truth-labeled synthetic memory lane unless a new deployment is explicitly verified.
+- Do not claim the Cloud Run profile uses AMD .5 or live Cognee; it runs the synthetic reasoner. AMD/Qwen local inference belongs to the sovereign-local profile.
 - Do not claim live AssemblyAI is enabled on the public revision until a Secret Manager binding is deployed.
 - Do not claim production work-order or building-control writes; the hackathon action is bounded/synthetic.
-- Do not claim `/healthz` is healthy until its current 404 discrepancy is fixed; `/api/state` is the verified operational endpoint.
+- Use `/health` and `/api/state` as the verified cloud endpoints. The custom cloud hostname currently returns 404 for `/healthz`, so do not use that path as evidence.
 
 ## Submission status
 
 Technical build: **ready**.
 
-Final submission verification: **108/108 tests PASS**, `compileall` PASS, `git diff --check` PASS, committed-secret regression test and LabLab field-limit checks included, no telephony mutation, no external model spend. Personal Brain loopback verified-outcome receiver merged independently after green CI.
+Final submission verification: **111/111 tests PASS**, Python 3.11/3.12 CI PASS, `compileall` PASS, `git diff --check` PASS, deployment-profile coverage included, no telephony mutation, no external model spend. Personal Brain loopback verified-outcome receiver merged independently after green CI.
 
 Still manual before organizer submission:
 
