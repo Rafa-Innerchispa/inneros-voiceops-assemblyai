@@ -34,6 +34,17 @@ We are not building another generic voice chatbot.
 
 **Voice is the interface. Governed execution is the product.**
 
+### One product, two execution planes
+
+The same VoiceOps application is presented in two real deployment profiles:
+
+- **Managed cloud:** `https://voiceops-cloud.creatorcore.ai/` runs on Google Cloud Run for customers who want managed infrastructure and elastic delivery.
+- **Sovereign local:** `https://voiceops.creatorcore.ai/` is served from local infrastructure and routes reasoning to the local AMD/Qwen runtime.
+- Both surfaces preserve the same approval, evidence, replay and no-production-write governance contract.
+- Each runtime self-identifies in the UI and health response so the demo does not blur cloud and local truth boundaries.
+
+AssemblyAI remains the realtime voice layer for the judged voice path. “Sovereign local” refers to the application/runtime, operational data boundary and local model inference; it does not falsely claim that AssemblyAI itself is an offline speech provider.
+
 The demo proves this chain:
 
 ```text
@@ -92,7 +103,7 @@ VoiceOps should:
 
 The public demo must never require customer PII, production credentials, or destructive actions.
 
-## Verified state — September 22, 2026
+## Verified state — September 25, 2026
 
 | Capability | State | Truth boundary |
 | --- | --- | --- |
@@ -107,12 +118,14 @@ The public demo must never require customer PII, production credentials, or dest
 | Judge-facing one-screen UI | ✅ Implemented | Synthetic mode clearly labeled |
 | Resource Fabric local-first route | ✅ Verified | `local-amd-5` selected |
 | AMD .5 live bounded inference | ✅ Verified separately | Qwen on local vLLM; external fallback false |
-| Automated tests | ✅ **108/108 PASS** | Final submission constraints + shared-memory verification, 2026-09-22/23 |
-| `compileall` | ✅ PASS | `src` + `tests`, 2026-09-22 |
-| `git diff --check` | ✅ PASS | 2026-09-22 |
+| Automated tests | ✅ **111/111 PASS** | Dual-deployment profiles + final submission constraints, 2026-09-25 |
+| `compileall` | ✅ PASS | `src` + `tests`, 2026-09-25 |
+| `git diff --check` | ✅ PASS | 2026-09-25 |
 | Live AssemblyAI provider session | ✅ Verified | Captured in the private/local live stack; public demo remains intentionally synthetic |
 | Voice-to-governed-action E2E | ✅ Verified | AssemblyAI -> InnerOS -> local AMD/Qwen -> verbal approval -> action -> Evidence/Replay |
-| Public judge URL | ✅ Deployed | `https://voiceops.creatorcore.ai/` |
+| Managed cloud showcase | ✅ Deployed | `https://voiceops-cloud.creatorcore.ai/` -> Google Cloud Run |
+| Sovereign local showcase | ✅ Deployed | `https://voiceops.creatorcore.ai/` -> local server + AMD/Qwen reasoner |
+| Dual-deployment parity | ✅ Verified | Same canonical source and governance UX; runtime profile is truth-labeled |
 | Maintained VoiceOps product | ✅ Advanced after hackathon branch | `Rafa-Innerchispa/inneros-voiceops` |
 | Governed FieldOps verbal-approval bridge | ✅ Integrated | `Rafa-Innerchispa/inneros-fieldops-agents-for-humans` |
 | Shared operational memory bridge | ✅ Implemented | Personal Brain/Cognee live-local; truth-labeled synthetic fallback for public judging |
@@ -121,7 +134,13 @@ The public demo must never require customer PII, production credentials, or dest
 
 ### Important live truth boundary
 
-The private/local stack has captured the live AssemblyAI -> InnerOS -> AMD .5 -> explicit approval -> governed action -> evidence loop. The public judge service deliberately remains a synthetic, production-write-disabled surface; it must not be described as using the private AMD runtime or as exposing production telephony/building controls.
+The project now exposes two judge-facing deployment profiles from the same canonical application:
+
+- **Cloud:** Google Cloud Run uses the safe synthetic reasoner, synthetic memory lane and `production_writes=false`.
+- **Sovereign local:** the local server runs the same judge UI and governance flow with `local-amd-5` / Qwen reasoning. The demo action remains bounded and non-production.
+- Live AssemblyAI voice can be enabled only where the server-side credential is configured. Local inference does not imply AssemblyAI runs offline.
+
+The private/local stack has also captured the complete AssemblyAI -> InnerOS -> AMD .5 -> explicit approval -> governed action -> evidence loop. Neither public surface exposes production telephony or building controls.
 
 The maintained VoiceOps product later completed the conversational SIP/RTP runtime and owner-confirmed end-to-end calling. That product-lineage work lives in `Rafa-Innerchispa/inneros-voiceops`; it is referenced here as post-hackathon evolution, not misrepresented as code contained in this submission repository.
 
@@ -327,7 +346,7 @@ The technical core is submission-ready. Final organizer closure now requires onl
 - [x] live AssemblyAI / governed-action evidence;
 - [x] exact-current-tree automated verification;
 - [x] bounded committed-secret regression scan;
-- [x] public judge-safe URL;
+- [x] managed Cloud Run and sovereign-local judge surfaces;
 - [x] final submission copy and judge instructions;
 - [ ] cover / architecture media;
 - [ ] fresh judge screenshots;
