@@ -41,7 +41,8 @@
             <span class="event-chip">ASSEMBLYAI VOICE AGENT HACKATHON · 2026</span>
           </div>
           <div class="badges">
-            <span class="badge badge-local"><span class="badge-dot"></span>LOCAL-FIRST</span>
+            <span id="deploymentBadge" class="badge deployment-badge"><span class="badge-dot"></span>DETECTING RUNTIME</span>
+            <span class="badge badge-local">LOCAL-FIRST POLICY</span>
             <span class="badge">JUDGE SAFE</span>
             <span class="badge">NO PROD WRITES</span>
           </div>
@@ -51,7 +52,7 @@
           <div class="hero-copy">
             <div class="hero-kicker">VOICE → GOVERNED EXECUTION → PROOF</div>
             <h1>Talk is cheap.<br><span>Actions need receipts.</span></h1>
-            <p class="hero-lede">AssemblyAI hears the operator in realtime. InnerOS recalls verified context, reasons, asks for explicit approval, mints a one-time execution permit, acts, verifies the result and remembers only what was proven.</p>
+            <p class="hero-lede">AssemblyAI hears the operator in realtime. InnerOS recalls verified context, reasons, asks for explicit approval, mints a one-time execution permit, acts, verifies the result and remembers only what was proven. The same governed workflow can run as a managed Google Cloud service or on sovereign local infrastructure.</p>
 
             <div class="hero-trust" aria-label="Verified project facts">
               <div class="trust-item"><strong>108/108</strong><span>tests passing</span></div>
@@ -124,6 +125,76 @@
                 <small>Speech is evidence. Memory is context. Approval is authorization.</small>
               </div>
             </div>
+          </div>
+        </section>
+
+        <section class="deployment-showcase card" aria-label="Cloud and sovereign local deployment options">
+          <div class="section-head deployment-head">
+            <div>
+              <div class="step-label">ONE PRODUCT · TWO DEPLOYMENT PLANES</div>
+              <h2>Managed cloud when you want scale. Sovereign local when you want control.</h2>
+            </div>
+            <div class="section-note">The interface and governance contract stay the same. Only the execution plane changes.</div>
+          </div>
+
+          <div class="deployment-grid">
+            <article id="cloudPlaneCard" class="deployment-plane cloud-plane">
+              <div class="plane-top">
+                <span class="plane-index">01</span>
+                <span class="plane-kind">MANAGED CLOUD</span>
+              </div>
+              <div class="plane-icon-wrap cloud-icon" aria-hidden="true">
+                <span></span><span></span><span></span>
+              </div>
+              <h3>Google Cloud Run</h3>
+              <p>Browser-accessible VoiceOps for customers who want managed infrastructure, elastic delivery and a zero-touch service surface.</p>
+              <div class="plane-facts">
+                <div><span>Compute</span><strong>Google Cloud Run</strong></div>
+                <div><span>Operations</span><strong>Managed service</strong></div>
+                <div><span>Judge surface</span><strong>Safe · no prod writes</strong></div>
+              </div>
+              <div class="plane-tags">
+                <span>Cloud Run</span><span>Managed scale</span><span>Public demo</span>
+              </div>
+            </article>
+
+            <div class="deployment-bridge" aria-hidden="true">
+              <span>SAME</span>
+              <strong>VOICEOPS</strong>
+              <span>GOVERNANCE</span>
+              <i></i>
+            </div>
+
+            <article id="localPlaneCard" class="deployment-plane local-plane">
+              <div class="plane-top">
+                <span class="plane-index">02</span>
+                <span class="plane-kind">SOVEREIGN LOCAL</span>
+              </div>
+              <div class="plane-icon-wrap local-icon" aria-hidden="true">
+                <span></span><span></span><span></span>
+              </div>
+              <h3>On-prem / Edge</h3>
+              <p>VoiceOps hosted on local servers with AMD/Qwen inference, customer-controlled data boundaries and direct access to local operational systems.</p>
+              <div class="plane-facts">
+                <div><span>Compute</span><strong>Local server</strong></div>
+                <div><span>Inference</span><strong>AMD / Qwen local</strong></div>
+                <div><span>Data boundary</span><strong>Customer controlled</strong></div>
+              </div>
+              <div class="plane-tags">
+                <span>Local models</span><span>Private data</span><span>Edge ready</span>
+              </div>
+            </article>
+          </div>
+
+          <div class="active-runtime">
+            <span class="runtime-pulse"></span>
+            <div class="runtime-title">
+              <small>THIS DEPLOYMENT</small>
+              <strong id="runtimeModeLabel">Detecting runtime…</strong>
+            </div>
+            <div class="runtime-metric"><span>Compute</span><strong id="runtimeCompute">—</strong></div>
+            <div class="runtime-metric"><span>Inference</span><strong id="runtimeInference">—</strong></div>
+            <div class="runtime-metric"><span>Boundary</span><strong id="runtimeBoundary">—</strong></div>
           </div>
         </section>
 

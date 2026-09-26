@@ -318,6 +318,50 @@ def _reasoning_mode(route: dict[str, Any]) -> str:
     return "pending"
 
 
+def _deployment_profile(reasoner_mode: str) -> dict[str, Any]:
+    configured = os.getenv("VOICEOPS_DEPLOYMENT_MODE", "").strip().lower()
+    if configured in {"cloud", "cloud_run", "managed_cloud"}:
+        mode = "cloud_run"
+    elif configured in {"local", "sovereign_local", "edge", "on_prem", "on-prem"}:
+        mode = "sovereign_local"
+    elif os.getenv("K_SERVICE"):
+        mode = "cloud_run"
+    elif reasoner_mode == "amd5":
+        mode = "sovereign_local"
+    else:
+        mode = "judge_safe"
+
+    if mode == "cloud_run":
+        return {
+            "mode": mode,
+            "label": "GOOGLE CLOUD RUN",
+            "surface": "Managed cloud deployment",
+            "compute": "Google Cloud Run",
+            "inference": "Judge-safe synthetic" if reasoner_mode == "synthetic" else "Configured cloud reasoner",
+            "data_boundary": "Cloud demo boundary",
+            "local_inference": False,
+        }
+    if mode == "sovereign_local":
+        return {
+            "mode": mode,
+            "label": "SOVEREIGN LOCAL",
+            "surface": "On-prem / edge deployment",
+            "compute": "Local server",
+            "inference": "AMD / Qwen local" if reasoner_mode == "amd5" else "Local judge-safe fixture",
+            "data_boundary": "Customer-controlled local boundary",
+            "local_inference": reasoner_mode == "amd5",
+        }
+    return {
+        "mode": mode,
+        "label": "JUDGE SAFE",
+        "surface": "Deterministic demo deployment",
+        "compute": "Current host",
+        "inference": "Judge-safe synthetic",
+        "data_boundary": "No production writes",
+        "local_inference": False,
+    }
+
+
 def build_gateway_factory(reasoner_mode: str) -> Callable[[], VoiceGateway]:
     if reasoner_mode == "synthetic":
         return VoiceGateway
@@ -367,6 +411,7 @@ class VoiceOpsHandler(BaseHTTPRequestHandler):
                 {
                     "ok": True,
                     "service": "inneros-voiceops",
+                    "deployment": self.server.deployment,  # type: ignore[attr-defined]
                     "live_voice_enabled": bool(self.server.live_voice_enabled),  # type: ignore[attr-defined]
                     "credential_configured": bool(os.getenv("ASSEMBLYAI_API_KEY")),
                     "guardian_voice_bridge_enabled": bool(self.server.bridge_token) or self._loopback_bridge_allowed(),  # type: ignore[attr-defined]
@@ -378,6 +423,7 @@ class VoiceOpsHandler(BaseHTTPRequestHandler):
         if self.path == "/api/state":
             state = self.store.snapshot()
             state["assemblyai_voice_agent_enabled"] = bool(self.server.live_voice_enabled)  # type: ignore[attr-defined]
+            state["deployment"] = self.server.deployment  # type: ignore[attr-defined]
             self._send_json(state)
             return
         if self.path == "/api/evidence":
@@ -414,15 +460,24 @@ class VoiceOpsHandler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:  # noqa: N802
         try:
             if self.path == "/api/reset":
-                self._send_json(self.store.reset())
+                state = self.store.reset()
+                state["assemblyai_voice_agent_enabled"] = bool(self.server.live_voice_enabled)  # type: ignore[attr-defined]
+                state["deployment"] = self.server.deployment  # type: ignore[attr-defined]
+                self._send_json(state)
                 return
             if self.path == "/api/intent":
                 payload = self._read_json()
-                self._send_json(self.store.submit_intent(str(payload.get("transcript") or DEFAULT_INTENT)))
+                state = self.store.submit_intent(str(payload.get("transcript") or DEFAULT_INTENT))
+                state["assemblyai_voice_agent_enabled"] = bool(self.server.live_voice_enabled)  # type: ignore[attr-defined]
+                state["deployment"] = self.server.deployment  # type: ignore[attr-defined]
+                self._send_json(state)
                 return
             if self.path == "/api/approve":
                 payload = self._read_json()
-                self._send_json(self.store.approve_pending(str(payload.get("transcript") or DEFAULT_APPROVAL)))
+                state = self.store.approve_pending(str(payload.get("transcript") or DEFAULT_APPROVAL))
+                state["assemblyai_voice_agent_enabled"] = bool(self.server.live_voice_enabled)  # type: ignore[attr-defined]
+                state["deployment"] = self.server.deployment  # type: ignore[attr-defined]
+                self._send_json(state)
                 return
             if self.path == "/api/tool/inspect-and-propose":
                 payload = self._read_json()
@@ -524,11 +579,13 @@ class VoiceOpsDemoServer(ThreadingHTTPServer):
         gateway_factory: Callable[[], VoiceGateway] | None = None,
         live_voice_enabled: bool = False,
         bridge_token: str = "",
+        deployment: dict[str, Any] | None = None,
     ) -> None:
         super().__init__(server_address, VoiceOpsHandler)
         self.store = DemoSessionStore(gateway_factory=gateway_factory)
         self.live_voice_enabled = live_voice_enabled
         self.bridge_token = bridge_token
+        self.deployment = deployment or _deployment_profile("synthetic")
         self.last_token_issued_at = 0.0
 
 
@@ -558,6 +615,7 @@ def main() -> None:
         gateway_factory=build_gateway_factory(args.reasoner),
         live_voice_enabled=args.enable_live_assemblyai,
         bridge_token=os.getenv("VOICEOPS_BRIDGE_TOKEN", ""),
+        deployment=_deployment_profile(args.reasoner),
     )
     print(
         f"InnerOS VoiceOps demo: http://{args.host}:{args.port} · reasoner={args.reasoner} "

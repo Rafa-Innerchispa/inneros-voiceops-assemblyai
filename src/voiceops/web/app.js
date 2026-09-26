@@ -13,7 +13,9 @@ const els = {
   liveVoiceBtn: $("liveVoiceBtn"), stopVoiceBtn: $("stopVoiceBtn"), voiceAgentStatus: $("voiceAgentStatus"), agentTranscript: $("agentTranscript"),
   memoryBeforeTruth: $("memoryBeforeTruth"), memoryBeforeProvider: $("memoryBeforeProvider"), memoryBeforeCount: $("memoryBeforeCount"), memoryBeforeSummary: $("memoryBeforeSummary"),
   memoryAfterTruth: $("memoryAfterTruth"), memoryAfterProvider: $("memoryAfterProvider"), memoryAfterCount: $("memoryAfterCount"), memoryAfterSummary: $("memoryAfterSummary"),
-  flowVoice: $("flowVoice"), flowMemory: $("flowMemory"), flowReason: $("flowReason"), flowApprove: $("flowApprove"), flowAct: $("flowAct"), flowVerify: $("flowVerify"), flowShare: $("flowShare")
+  flowVoice: $("flowVoice"), flowMemory: $("flowMemory"), flowReason: $("flowReason"), flowApprove: $("flowApprove"), flowAct: $("flowAct"), flowVerify: $("flowVerify"), flowShare: $("flowShare"),
+  deploymentBadge: $("deploymentBadge"), cloudPlaneCard: $("cloudPlaneCard"), localPlaneCard: $("localPlaneCard"),
+  runtimeModeLabel: $("runtimeModeLabel"), runtimeCompute: $("runtimeCompute"), runtimeInference: $("runtimeInference"), runtimeBoundary: $("runtimeBoundary")
 };
 
 async function api(path, options = {}) {
@@ -37,6 +39,25 @@ function row(label, value) {
   right.textContent = value ?? "—";
   div.append(left, right);
   return div;
+}
+
+function renderDeployment(profile = {}) {
+  if (!profile || !profile.mode) return;
+  const isCloud = profile.mode === "cloud_run";
+  const isLocal = profile.mode === "sovereign_local";
+
+  if (els.deploymentBadge) {
+    els.deploymentBadge.textContent = `● ${profile.label || "RUNTIME"}`;
+    els.deploymentBadge.className = "badge deployment-badge";
+    if (isCloud) els.deploymentBadge.classList.add("cloud-active");
+    if (isLocal) els.deploymentBadge.classList.add("local-active");
+  }
+  if (els.cloudPlaneCard) els.cloudPlaneCard.classList.toggle("is-active", isCloud);
+  if (els.localPlaneCard) els.localPlaneCard.classList.toggle("is-active", isLocal);
+  if (els.runtimeModeLabel) els.runtimeModeLabel.textContent = profile.surface || profile.label || "VoiceOps runtime";
+  if (els.runtimeCompute) els.runtimeCompute.textContent = profile.compute || "—";
+  if (els.runtimeInference) els.runtimeInference.textContent = profile.inference || "—";
+  if (els.runtimeBoundary) els.runtimeBoundary.textContent = profile.data_boundary || "—";
 }
 
 function renderGuardian(guardian) {
@@ -180,6 +201,7 @@ function renderTimeline(items = []) {
 }
 
 function render(state) {
+  renderDeployment(state.deployment);
   els.sessionId.textContent = state.session_id; els.correlationId.textContent = state.correlation_id;
   if (!voiceAgent.liveTranscriptActive) els.transcript.textContent = state.transcript || "No transcript yet.";
   if (state.transcript && !voiceAgent.liveTranscriptActive) setState(els.voiceState, "FINAL TRANSCRIPT", "ready");
