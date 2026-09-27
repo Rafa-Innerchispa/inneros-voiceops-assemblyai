@@ -4,6 +4,7 @@ import argparse
 import hmac
 import json
 import os
+import subprocess
 import threading
 import time
 from http import HTTPStatus
@@ -28,6 +29,8 @@ DEFAULT_APPROVAL = "Si, autorizo."
 VOICE_AGENT_TOKEN_URL = "https://agents.assemblyai.com/v1/token"
 VOICE_AGENT_TOKEN_TTL_SECONDS = 120
 VOICE_AGENT_TOKEN_RATE_LIMIT_SECONDS = 5.0
+INNEROS_PROVIDER_PYTHON_ENV = "VOICEOPS_INNEROS_PROVIDER_PYTHON"
+INNEROS_PLATFORM_PATH_ENV = "VOICEOPS_INNEROS_PLATFORM_PATH"
 
 
 def _env_truthy(name: str, default: bool = False) -> bool:
@@ -370,6 +373,60 @@ def build_gateway_factory(reasoner_mode: str) -> Callable[[], VoiceGateway]:
     raise ValueError(f"unsupported reasoner mode: {reasoner_mode}")
 
 
+def _inneros_provider_bridge_configured() -> bool:
+    python_path = os.getenv(INNEROS_PROVIDER_PYTHON_ENV, "").strip()
+    platform_path = os.getenv(INNEROS_PLATFORM_PATH_ENV, "").strip()
+    return bool(python_path and platform_path and Path(python_path).is_file() and Path(platform_path).is_dir())
+
+
+def mint_voice_agent_token_from_inneros_provider(
+    *,
+    expires_in_seconds: int = VOICE_AGENT_TOKEN_TTL_SECONDS,
+    timeout_seconds: float = 8.0,
+    runner: Callable[..., Any] = subprocess.run,
+) -> dict[str, Any]:
+    """Mint an ephemeral browser token through the canonical InnerOS provider.
+
+    The permanent AssemblyAI credential remains inside Owner Vault. The child
+    process returns only the short-lived token that is already intended for the
+    browser session.
+    """
+    python_path = os.getenv(INNEROS_PROVIDER_PYTHON_ENV, "").strip()
+    platform_path = os.getenv(INNEROS_PLATFORM_PATH_ENV, "").strip()
+    if not python_path or not platform_path:
+        raise ValueError("InnerOS AssemblyAI provider bridge is not configured")
+    if not Path(python_path).is_file() or not Path(platform_path).is_dir():
+        raise ValueError("InnerOS AssemblyAI provider bridge path is invalid")
+    ttl = max(1, min(int(expires_in_seconds), 600))
+    helper = (
+        "import json,sys;"
+        "sys.path.insert(0,sys.argv[1]);"
+        "from inneros_core_runtime import assemblyai_provider;"
+        "print(json.dumps(assemblyai_provider.create_browser_token("
+        "expires_in_seconds=int(sys.argv[2]))))"
+    )
+    completed = runner(
+        [python_path, "-c", helper, platform_path, str(ttl)],
+        capture_output=True,
+        text=True,
+        timeout=max(2.0, float(timeout_seconds) + 4.0),
+        check=False,
+    )
+    if int(getattr(completed, "returncode", 1)) != 0:
+        raise RuntimeError("InnerOS AssemblyAI provider bridge failed")
+    raw = str(getattr(completed, "stdout", "") or "").strip().splitlines()
+    if not raw:
+        raise RuntimeError("InnerOS AssemblyAI provider bridge returned no result")
+    try:
+        payload = json.loads(raw[-1])
+    except json.JSONDecodeError as exc:
+        raise RuntimeError("InnerOS AssemblyAI provider bridge returned invalid JSON") from exc
+    token = payload.get("token") if isinstance(payload, dict) else None
+    if not payload.get("ok") or not isinstance(token, str) or not token:
+        raise RuntimeError("InnerOS AssemblyAI provider could not mint a temporary token")
+    return {"token": token, "expires_in_seconds": ttl, "auth_source": "inneros_owner_vault"}
+
+
 def mint_voice_agent_token(
     api_key: str,
     *,
@@ -413,7 +470,12 @@ class VoiceOpsHandler(BaseHTTPRequestHandler):
                     "service": "inneros-voiceops",
                     "deployment": self.server.deployment,  # type: ignore[attr-defined]
                     "live_voice_enabled": bool(self.server.live_voice_enabled),  # type: ignore[attr-defined]
-                    "credential_configured": bool(os.getenv("ASSEMBLYAI_API_KEY")),
+                    "credential_configured": bool(os.getenv("ASSEMBLYAI_API_KEY")) or _inneros_provider_bridge_configured(),
+                    "assemblyai_auth_source": (
+                        "inneros_owner_vault"
+                        if _inneros_provider_bridge_configured()
+                        else ("environment" if os.getenv("ASSEMBLYAI_API_KEY") else "none")
+                    ),
                     "guardian_voice_bridge_enabled": bool(self.server.bridge_token) or self._loopback_bridge_allowed(),  # type: ignore[attr-defined]
                     "guardian_voice_bridge_mode": "token" if self.server.bridge_token else ("loopback_only" if self._loopback_bridge_allowed() else "disabled"),  # type: ignore[attr-defined]
                     "production_writes": False,
@@ -532,7 +594,8 @@ class VoiceOpsHandler(BaseHTTPRequestHandler):
             )
             return
         api_key = os.getenv("ASSEMBLYAI_API_KEY", "")
-        if not api_key:
+        provider_bridge = _inneros_provider_bridge_configured()
+        if not api_key and not provider_bridge:
             self._send_json(
                 {"error": "AssemblyAI server credential is not configured"},
                 status=HTTPStatus.SERVICE_UNAVAILABLE,
@@ -543,7 +606,11 @@ class VoiceOpsHandler(BaseHTTPRequestHandler):
         if now - last < VOICE_AGENT_TOKEN_RATE_LIMIT_SECONDS:
             self._send_json({"error": "voice token rate limit"}, status=HTTPStatus.TOO_MANY_REQUESTS)
             return
-        token_payload = mint_voice_agent_token(api_key)
+        token_payload = (
+            mint_voice_agent_token_from_inneros_provider()
+            if provider_bridge
+            else mint_voice_agent_token(api_key)
+        )
         self.server.last_token_issued_at = now  # type: ignore[attr-defined]
         self._send_json(token_payload)
 
