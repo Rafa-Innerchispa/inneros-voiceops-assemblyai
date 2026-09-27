@@ -11,6 +11,8 @@ const els = {
   proposalEmpty: $("proposalEmpty"), proposalData: $("proposalData"), approvalGate: $("approvalGate"), actionResult: $("actionResult"),
   timeline: $("timeline"), htrBox: $("htrBox"), sessionId: $("sessionId"), correlationId: $("correlationId"),
   liveVoiceBtn: $("liveVoiceBtn"), stopVoiceBtn: $("stopVoiceBtn"), voiceAgentStatus: $("voiceAgentStatus"), agentTranscript: $("agentTranscript"),
+  coreActionLabel: $("coreActionLabel"),
+  orbitAssembly: $("orbitAssembly"), orbitRecall: $("orbitRecall"), orbitReason: $("orbitReason"), orbitPermit: $("orbitPermit"), orbitProof: $("orbitProof"),
   memoryBeforeTruth: $("memoryBeforeTruth"), memoryBeforeProvider: $("memoryBeforeProvider"), memoryBeforeCount: $("memoryBeforeCount"), memoryBeforeSummary: $("memoryBeforeSummary"),
   memoryAfterTruth: $("memoryAfterTruth"), memoryAfterProvider: $("memoryAfterProvider"), memoryAfterCount: $("memoryAfterCount"), memoryAfterSummary: $("memoryAfterSummary"),
   flowVoice: $("flowVoice"), flowMemory: $("flowMemory"), flowReason: $("flowReason"), flowApprove: $("flowApprove"), flowAct: $("flowAct"), flowVerify: $("flowVerify"), flowShare: $("flowShare"),
@@ -119,6 +121,12 @@ function setFlow(el, active, complete = false) {
   else if (active) el.classList.add("active");
 }
 
+function setOrbit(el, active, complete = false) {
+  if (!el) return;
+  el.classList.toggle("active", Boolean(active) && !complete);
+  el.classList.toggle("complete", Boolean(complete));
+}
+
 function renderMemory(state) {
   const shared = state.shared_memory || {};
   const before = shared.before_action || {};
@@ -154,6 +162,11 @@ function renderMemory(state) {
   setFlow(els.flowAct, Boolean(state.action), Boolean(state.action));
   setFlow(els.flowVerify, Boolean(writeback.status || state.action), Boolean(writeback.verification_passed));
   setFlow(els.flowShare, Boolean(cross.status), Boolean(cross.count));
+  setOrbit(els.orbitAssembly, Boolean(state.transcript) || voiceAgent.ready, Boolean(state.transcript));
+  setOrbit(els.orbitRecall, Boolean(before.status), Boolean(before.count));
+  setOrbit(els.orbitReason, Boolean(state.route && Object.keys(state.route).length), Boolean(state.proposal));
+  setOrbit(els.orbitPermit, Boolean(state.pending_approval || state.approval), Boolean(state.action));
+  setOrbit(els.orbitProof, Boolean(state.action || writeback.status), Boolean(writeback.verification_passed));
 }
 
 function renderProposal(state) {
@@ -287,6 +300,20 @@ function phaseUpdate(phase) {
 
 function setLiveStatus(text, kind = "") { els.voiceAgentStatus.textContent = text; els.voiceAgentStatus.className = kind ? `live-status ${kind}` : "live-status"; }
 
+function setVoiceCoreState(state, statusText = "") {
+  if (!els.liveVoiceBtn) return;
+  els.liveVoiceBtn.dataset.state = state;
+  const active = ["connecting", "ready", "user-speaking", "agent-speaking"].includes(state);
+  els.liveVoiceBtn.setAttribute("aria-label", active ? "Stop live voice" : "Start live voice");
+  if (els.coreActionLabel) {
+    if (state === "idle") els.coreActionLabel.textContent = "PRESS FOR LIVE VOICE";
+    else if (state === "connecting") els.coreActionLabel.textContent = "CONNECTING…";
+    else if (state === "error") els.coreActionLabel.textContent = "PRESS TO RETRY";
+    else els.coreActionLabel.textContent = "PRESS TO STOP";
+  }
+  if (statusText) setLiveStatus(statusText, state === "error" ? "blocked" : active ? "active" : "");
+}
+
 function pcm16Base64(floatSamples, inputRate) {
   const ratio = inputRate / 24000; const outputLength = Math.max(1, Math.floor(floatSamples.length / ratio));
   const pcm = new Int16Array(outputLength);
@@ -301,6 +328,8 @@ function pcm16Base64(floatSamples, inputRate) {
 
 function playVoiceAgentAudio(data) {
   if (!voiceAgent.audioCtx) return;
+  setVoiceCoreState("agent-speaking", "INNEROS SPEAKING · PRESS CORE TO STOP");
+  setState(els.voiceState, "SPEAKING", "active");
   const binary = atob(data); const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
   const pcm = new Int16Array(bytes.buffer); const buffer = voiceAgent.audioCtx.createBuffer(1, pcm.length, 24000);
@@ -308,7 +337,13 @@ function playVoiceAgentAudio(data) {
   const source = voiceAgent.audioCtx.createBufferSource(); source.buffer = buffer; source.connect(voiceAgent.audioCtx.destination);
   const startAt = Math.max(voiceAgent.audioCtx.currentTime, voiceAgent.nextPlaybackTime); source.start(startAt);
   voiceAgent.nextPlaybackTime = startAt + buffer.duration; voiceAgent.scheduledAudio.push(source);
-  source.onended = () => { voiceAgent.scheduledAudio = voiceAgent.scheduledAudio.filter((item) => item !== source); };
+  source.onended = () => {
+    voiceAgent.scheduledAudio = voiceAgent.scheduledAudio.filter((item) => item !== source);
+    if (!voiceAgent.scheduledAudio.length && voiceAgent.ready) {
+      setVoiceCoreState("ready", `LIVE · ${voiceAgent.sessionId}`);
+      setState(els.voiceState, "LISTENING", "ready");
+    }
+  };
 }
 
 function flushVoicePlayback() {
@@ -342,9 +377,15 @@ async function flushToolCalls() {
 async function handleVoiceAgentMessage(event) {
   const msg = JSON.parse(event.data);
   if (msg.type === "session.ready") {
-    voiceAgent.ready = true; voiceAgent.sessionId = msg.session_id; setLiveStatus(`LIVE · ${msg.session_id}`, "ready"); setState(els.voiceState, "LISTENING", "ready");
-  } else if (msg.type === "input.speech.started") setState(els.voiceState, "LISTENING", "active");
-  else if (msg.type === "input.speech.stopped") setState(els.voiceState, "TURN DETECTED", "warning");
+    voiceAgent.ready = true; voiceAgent.sessionId = msg.session_id; setVoiceCoreState("ready", `LIVE · ${msg.session_id}`); setState(els.voiceState, "LISTENING", "ready");
+  } else if (msg.type === "input.speech.started") {
+    setVoiceCoreState("user-speaking", "YOU ARE SPEAKING · ASSEMBLYAI LISTENING");
+    setState(els.voiceState, "LISTENING", "active");
+  }
+  else if (msg.type === "input.speech.stopped") {
+    setVoiceCoreState("ready", "TURN DETECTED · PROCESSING");
+    setState(els.voiceState, "TURN DETECTED", "warning");
+  }
   else if (msg.type === "transcript.user.delta") { voiceAgent.liveTranscriptActive = true; els.transcript.textContent = msg.text || ""; setState(els.voiceState, "TRANSCRIBING", "active"); }
   else if (msg.type === "transcript.user") { voiceAgent.lastFinalUserTranscript = msg.text || ""; els.transcript.textContent = voiceAgent.lastFinalUserTranscript || "No transcript yet."; setState(els.voiceState, "FINAL TRANSCRIPT", "ready"); }
   else if (msg.type === "reply.audio" && msg.data) playVoiceAgentAudio(msg.data);
@@ -358,13 +399,13 @@ async function handleVoiceAgentMessage(event) {
   }
   else if (msg.type === "reply.done") {
     if (msg.status === "interrupted") { voiceAgent.pendingToolCalls = []; flushVoicePlayback(); setLiveStatus("INTERRUPTED · pending tools discarded", "warning"); }
-    else { await flushToolCalls(); if (voiceAgent.ready) setLiveStatus(`LIVE · ${voiceAgent.sessionId}`, "ready"); }
-  } else if (msg.type === "session.error") setLiveStatus(`ERROR · ${msg.code || "session"}: ${msg.message || "unknown"}`, "blocked");
+    else { await flushToolCalls(); if (voiceAgent.ready && !voiceAgent.scheduledAudio.length) setVoiceCoreState("ready", `LIVE · ${voiceAgent.sessionId}`); }
+  } else if (msg.type === "session.error") setVoiceCoreState("error", `ERROR · ${msg.code || "session"}: ${msg.message || "unknown"}`);
   else if (msg.type === "session.ended") { setLiveStatus("SESSION ENDED"); cleanupVoiceAgent(false); }
 }
 
 async function startVoiceAgent() {
-  els.liveVoiceBtn.disabled = true; setLiveStatus("REQUESTING SHORT-LIVED TOKEN…", "active");
+  setVoiceCoreState("connecting", "REQUESTING SHORT-LIVED TOKEN…");
   try {
     const current = await api("/api/state"); if (!current.assemblyai_voice_agent_enabled) throw new Error("Live AssemblyAI mode is disabled on this server.");
     await api("/api/reset", {method: "POST", body: "{}"}); const tokenPayload = await api("/api/assemblyai/token");
@@ -383,7 +424,7 @@ async function startVoiceAgent() {
       voiceAgent.ws.send(JSON.stringify({type: "input.audio", audio: pcm16Base64(audioEvent.inputBuffer.getChannelData(0), voiceAgent.audioCtx.sampleRate)}));
     };
     els.stopVoiceBtn.disabled = false;
-  } catch (err) { setLiveStatus(`OFFLINE · ${err.message}`, "blocked"); cleanupVoiceAgent(false); }
+  } catch (err) { cleanupVoiceAgent(false); setVoiceCoreState("error", `OFFLINE · ${err.message}`); }
 }
 
 function cleanupVoiceAgent(closeSocket = true) {
@@ -394,6 +435,8 @@ function cleanupVoiceAgent(closeSocket = true) {
   if (closeSocket && voiceAgent.ws && voiceAgent.ws.readyState === WebSocket.OPEN) voiceAgent.ws.close();
   voiceAgent.ws = null; voiceAgent.mediaStream = null; voiceAgent.audioCtx = null; voiceAgent.processor = null; voiceAgent.source = null; voiceAgent.silentGain = null;
   voiceAgent.sessionId = null; voiceAgent.lastFinalUserTranscript = ""; els.liveVoiceBtn.disabled = false; els.stopVoiceBtn.disabled = true;
+  setVoiceCoreState("idle", "READY · PRESS THE CORE");
+  setState(els.voiceState, "IDLE", "ready");
 }
 
 function stopVoiceAgent() {
@@ -402,7 +445,13 @@ function stopVoiceAgent() {
   } else { cleanupVoiceAgent(true); setLiveStatus("SESSION ENDED"); }
 }
 
-els.liveVoiceBtn.addEventListener("click", startVoiceAgent); els.stopVoiceBtn.addEventListener("click", stopVoiceAgent);
+els.liveVoiceBtn.addEventListener("click", () => {
+  const active = voiceAgent.ready || Boolean(voiceAgent.ws) || Boolean(voiceAgent.mediaStream);
+  if (active) stopVoiceAgent();
+  else startVoiceAgent();
+});
+els.stopVoiceBtn.addEventListener("click", stopVoiceAgent);
 window.addEventListener("beforeunload", () => { if (voiceAgent.ws && voiceAgent.ws.readyState === WebSocket.OPEN) { try { voiceAgent.ws.send(JSON.stringify({type: "session.end"})); } catch (_) {} } });
 
+setVoiceCoreState("idle", "READY · PRESS THE CORE");
 refresh();
