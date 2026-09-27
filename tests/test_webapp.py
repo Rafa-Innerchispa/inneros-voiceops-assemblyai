@@ -81,6 +81,16 @@ def test_tool_inspect_duplicate_same_intent_is_idempotent_while_pending() -> Non
     assert len(proposals) == 1
 
 
+def test_tool_recall_and_inspect_return_memory_to_voice_agent() -> None:
+    store = DemoSessionStore()
+    recalled = store.tool_recall("qué recuerda VoiceOps del acceso norte")
+    assert recalled["count"] >= 1
+    assert recalled["truth"] == "SYNTHETIC"
+    inspected = store.tool_inspect("Revisa la incidencia del acceso norte")
+    assert inspected["memory"]["count"] >= 1
+    assert inspected["memory_bridge"]["provider"] == "judge-safe-memory"
+
+
 def test_tool_approve_duplicate_is_idempotent_and_does_not_reexecute() -> None:
     store = DemoSessionStore()
     store.tool_inspect("Revisa la incidencia del acceso norte")

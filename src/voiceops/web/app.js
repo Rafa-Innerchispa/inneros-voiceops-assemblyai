@@ -19,6 +19,7 @@ const els = {
   deploymentBadge: $("deploymentBadge"), cloudPlaneCard: $("cloudPlaneCard"), localPlaneCard: $("localPlaneCard"),
   runtimeModeLabel: $("runtimeModeLabel"), runtimeCompute: $("runtimeCompute"), runtimeInference: $("runtimeInference"), runtimeBoundary: $("runtimeBoundary")
 };
+let currentState = null;
 
 async function api(path, options = {}) {
   const response = await fetch(path, {headers: {"Content-Type": "application/json"}, ...options});
@@ -98,6 +99,9 @@ function renderRoute(route) {
   if (provider === "local-amd-5" && truth === "LIVE_MODEL_RESPONSE") {
     els.reasoningTitle.textContent = "AMD .5 local reasoning";
     setState(els.amdState, "AMD .5 LIVE", "active");
+  } else if (provider === "local-intel-4" && truth === "LIVE_MODEL_RESPONSE") {
+    els.reasoningTitle.textContent = "Intel / Qwen local reasoning";
+    setState(els.amdState, "QWEN LOCAL", "active");
   } else if (truth === "SYNTHETIC") {
     els.reasoningTitle.textContent = "Offline-safe reasoner";
     setState(els.amdState, "SYNTHETIC", "warning");
@@ -214,6 +218,7 @@ function renderTimeline(items = []) {
 }
 
 function render(state) {
+  currentState = state;
   renderDeployment(state.deployment);
   els.sessionId.textContent = state.session_id; els.correlationId.textContent = state.correlation_id;
   if (!voiceAgent.liveTranscriptActive) els.transcript.textContent = state.transcript || "No transcript yet.";
@@ -262,6 +267,11 @@ const inspectTool = {
   description: "Call this whenever the user asks to review, inspect, check, open, create, or act on an operational incident, access point, device, or work order. Do not answer operational requests from memory. This tool only inspects and proposes; it never executes the consequential action.",
   parameters: {type: "object", properties: {}, required: []}
 };
+const recallTool = {
+  type: "function", name: "recall_verified_context", execution_mode: "interactive",
+  description: "Call this for questions about memory, prior verified outcomes, what InnerOS remembers, or operational history. It is read-only and never authorizes an action.",
+  parameters: {type: "object", properties: {}, required: []}
+};
 const approveTool = {
   type: "function", name: "approve_pending_action", execution_mode: "interactive",
   description: "Call this only when an action proposal is already pending AND the user's latest finalized words explicitly authorize it, for example 'sí, autorizo'. Never call it for vague, conditional, implied, or agent-generated approval.",
@@ -271,30 +281,32 @@ const approveTool = {
 function voiceAgentConfig() {
   return {type: "session.update", session: {
     system_prompt: [
-      "Eres la interfaz de voz de InnerOS VoiceOps. Responde en español y de forma breve.",
-      "No inventes ni simules estado operativo. Para cualquier solicitud operativa debes llamar a inspect_and_propose_action.",
+      "Eres la interfaz de voz de InnerOS VoiceOps. Habla en español latinoamericano natural, claro y conversacional, y responde de forma breve.",
+      "Si el usuario pregunta qué recuerda el sistema, historial o memoria, llama a recall_verified_context y usa únicamente el resultado real de esa herramienta.",
+      "No digas que no tienes acceso a memoria si la herramienta devolvió resultados. Si devuelve cero resultados, di que no encontró memoria verificada para esa consulta.",
+      "No inventes ni simules estado operativo. Para cualquier solicitud de inspección o acción operativa debes llamar a inspect_and_propose_action.",
       "Ejemplo: Usuario: 'revisa la incidencia del acceso norte'. Tú: [call inspect_and_propose_action].",
       "Cuando tengas dudas, llama la herramienta; responder desde memoria es incorrecto."
     ].join(" "),
-    greeting: "InnerOS VoiceOps está listo. Dime qué incidencia operativa quieres que revise.",
-    output: {voice: "anna", format: {encoding: "audio/pcm"}},
+    greeting: "VoiceOps está listo. Dime qué quieres revisar.",
+    output: {voice: "diego", format: {encoding: "audio/pcm"}},
     input: {
       format: {encoding: "audio/pcm"},
       keyterms: ["InnerOS", "Ralphi", "acceso norte", "orden técnica", "sí autorizo", "sí apruebo"],
       language_codes: ["es"]
     },
-    tools: [inspectTool]
+    tools: [recallTool, inspectTool]
   }};
 }
 
 function phaseUpdate(phase) {
   if (phase === "approval") return {type: "session.update", session: {
     system_prompt: "Hay una propuesta pendiente. Explica brevemente el resultado de la herramienta y pide autorización humana explícita. No ejecutes nada todavía. Si la última respuesta del usuario autoriza explícitamente, por ejemplo 'sí, autorizo', llama a approve_pending_action. Ejemplo: Usuario: 'sí, autorizo'. Tú: [call approve_pending_action].",
-    tools: [approveTool]
+    tools: [recallTool, approveTool]
   }};
   return {type: "session.update", session: {
-    system_prompt: "La operación gobernada ya terminó. Usa únicamente el resultado de la herramienta para confirmar el estado, el identificador de la orden si existe y que se registró Decision Evidence. No llames más herramientas.",
-    tools: []
+    system_prompt: "La operación gobernada ya terminó. Usa únicamente el resultado de la herramienta para confirmar el estado, el identificador de la orden si existe y que se registró Decision Evidence. Puedes usar recall_verified_context para responder preguntas posteriores de memoria, pero no ejecutes nuevas acciones sin una nueva inspección.",
+    tools: [recallTool]
   }};
 }
 
@@ -354,6 +366,7 @@ function flushVoicePlayback() {
 async function executeVoiceTool(call) {
   const exactUserText = voiceAgent.lastFinalUserTranscript.trim();
   if (!exactUserText) return {error: "no finalized user transcript available for tool binding"};
+  if (call.name === "recall_verified_context") return api("/api/tool/recall", {method: "POST", body: JSON.stringify({query: exactUserText})});
   if (call.name === "inspect_and_propose_action") return api("/api/tool/inspect-and-propose", {method: "POST", body: JSON.stringify({intent: exactUserText})});
   if (call.name === "approve_pending_action") return api("/api/tool/approve-pending", {method: "POST", body: JSON.stringify({authorization_phrase: exactUserText})});
   return {error: `unsupported tool: ${call.name}`};
@@ -363,6 +376,12 @@ async function flushToolCalls() {
   if (!voiceAgent.ws || voiceAgent.ws.readyState !== WebSocket.OPEN) return;
   const calls = voiceAgent.pendingToolCalls.splice(0);
   for (const call of calls) {
+    if (call.name === "recall_verified_context") setOrbit(els.orbitRecall, true, false);
+    if (call.name === "inspect_and_propose_action") {
+      setOrbit(els.orbitRecall, true, false);
+      setOrbit(els.orbitReason, true, false);
+    }
+    if (call.name === "approve_pending_action") setOrbit(els.orbitPermit, true, false);
     let result; try { result = await executeVoiceTool(call); await refresh(); } catch (err) { result = {error: err.message}; }
     if (call.name === "inspect_and_propose_action" && !result.error) {
       voiceAgent.ws.send(JSON.stringify(phaseUpdate(result.requires_approval ? "approval" : "complete")));
@@ -378,16 +397,18 @@ async function handleVoiceAgentMessage(event) {
   const msg = JSON.parse(event.data);
   if (msg.type === "session.ready") {
     voiceAgent.ready = true; voiceAgent.sessionId = msg.session_id; setVoiceCoreState("ready", `LIVE · ${msg.session_id}`); setState(els.voiceState, "LISTENING", "ready");
+    setOrbit(els.orbitAssembly, true, false);
   } else if (msg.type === "input.speech.started") {
     setVoiceCoreState("user-speaking", "YOU ARE SPEAKING · ASSEMBLYAI LISTENING");
     setState(els.voiceState, "LISTENING", "active");
+    setOrbit(els.orbitAssembly, true, false);
   }
   else if (msg.type === "input.speech.stopped") {
     setVoiceCoreState("ready", "TURN DETECTED · PROCESSING");
     setState(els.voiceState, "TURN DETECTED", "warning");
   }
   else if (msg.type === "transcript.user.delta") { voiceAgent.liveTranscriptActive = true; els.transcript.textContent = msg.text || ""; setState(els.voiceState, "TRANSCRIBING", "active"); }
-  else if (msg.type === "transcript.user") { voiceAgent.lastFinalUserTranscript = msg.text || ""; els.transcript.textContent = voiceAgent.lastFinalUserTranscript || "No transcript yet."; setState(els.voiceState, "FINAL TRANSCRIPT", "ready"); }
+  else if (msg.type === "transcript.user") { voiceAgent.lastFinalUserTranscript = msg.text || ""; els.transcript.textContent = voiceAgent.lastFinalUserTranscript || "No transcript yet."; setState(els.voiceState, "FINAL TRANSCRIPT", "ready"); setOrbit(els.orbitAssembly, true, true); }
   else if (msg.type === "reply.audio" && msg.data) playVoiceAgentAudio(msg.data);
   else if (msg.type === "transcript.agent") els.agentTranscript.textContent = msg.text || "";
   else if (msg.type === "tool.call") {
@@ -449,6 +470,52 @@ els.liveVoiceBtn.addEventListener("click", () => {
   const active = voiceAgent.ready || Boolean(voiceAgent.ws) || Boolean(voiceAgent.mediaStream);
   if (active) stopVoiceAgent();
   else startVoiceAgent();
+});
+els.orbitAssembly.addEventListener("click", () => {
+  const active = voiceAgent.ready || Boolean(voiceAgent.ws) || Boolean(voiceAgent.mediaStream);
+  if (!active) startVoiceAgent();
+  else {
+    setOrbit(els.orbitAssembly, true, false);
+    els.agentTranscript.textContent = `AssemblyAI live · session ${voiceAgent.sessionId || "connecting"} · Spanish realtime voice`;
+  }
+});
+els.orbitRecall.addEventListener("click", async () => {
+  const query = voiceAgent.lastFinalUserTranscript || currentState?.transcript || "últimos resultados operativos verificados de VoiceOps";
+  setOrbit(els.orbitRecall, true, false);
+  try {
+    const result = await api("/api/tool/recall", {method: "POST", body: JSON.stringify({query})});
+    await refresh();
+    const first = Array.isArray(result.hits) && result.hits.length ? result.hits[0] : null;
+    els.agentTranscript.textContent = first?.summary || `Recall ${result.truth || "UNVERIFIED"} · ${result.count || 0} resultados`;
+  } catch (err) { els.agentTranscript.textContent = `Recall error · ${err.message}`; }
+});
+els.orbitReason.addEventListener("click", async () => {
+  const intent = voiceAgent.lastFinalUserTranscript || currentState?.transcript;
+  if (!intent) { els.agentTranscript.textContent = "Habla primero: Reason necesita una intención operativa concreta."; return; }
+  setOrbit(els.orbitReason, true, false);
+  try {
+    const result = await api("/api/tool/inspect-and-propose", {method: "POST", body: JSON.stringify({intent})});
+    await refresh();
+    els.agentTranscript.textContent = result.proposal?.summary || "Reason completó la inspección sin proponer una acción.";
+  } catch (err) { els.agentTranscript.textContent = `Reason error · ${err.message}`; }
+});
+els.orbitPermit.addEventListener("click", async () => {
+  if (!currentState?.pending_approval) { els.agentTranscript.textContent = "Permit está bloqueado: no hay una acción pendiente de autorización."; return; }
+  setOrbit(els.orbitPermit, true, false);
+  try {
+    const result = await api("/api/tool/approve-pending", {method: "POST", body: JSON.stringify({authorization_phrase: "Sí, autorizo desde Permit + Act."})});
+    await refresh();
+    els.agentTranscript.textContent = result.action ? `Autorizado · ${result.action.action_id} · ${result.action.status}` : "Autorización procesada.";
+  } catch (err) { els.agentTranscript.textContent = `Permit error · ${err.message}`; }
+});
+els.orbitProof.addEventListener("click", async () => {
+  try {
+    const [evidence, replay] = await Promise.all([api("/api/evidence"), api("/api/replay")]);
+    els.dialogTitle.textContent = "Verify · Decision Evidence + Replay";
+    els.jsonOutput.textContent = JSON.stringify({evidence, replay}, null, 2);
+    els.dialog.showModal();
+    setOrbit(els.orbitProof, true, Boolean(currentState?.action));
+  } catch (err) { els.agentTranscript.textContent = `Verify error · ${err.message}`; }
 });
 els.stopVoiceBtn.addEventListener("click", stopVoiceAgent);
 window.addEventListener("beforeunload", () => { if (voiceAgent.ws && voiceAgent.ws.readyState === WebSocket.OPEN) { try { voiceAgent.ws.send(JSON.stringify({type: "session.end"})); } catch (_) {} } });
