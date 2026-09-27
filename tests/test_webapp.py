@@ -1,4 +1,11 @@
-from voiceops.webapp import DemoSessionStore, MAX_TRANSCRIPT_CHARS
+import json
+from types import SimpleNamespace
+
+from voiceops.webapp import (
+    DemoSessionStore,
+    MAX_TRANSCRIPT_CHARS,
+    mint_voice_agent_token_from_inneros_provider,
+)
 
 
 def test_web_demo_starts_safe_and_empty() -> None:
@@ -139,3 +146,43 @@ def test_guardian_whatsapp_voice_bridge_duplicate_after_completion_is_idempotent
     assert duplicate["bridge_status"] == "already_completed"
     assert duplicate["action"]["action_id"] == completed["action"]["action_id"]
     assert len(executions) == 1
+
+
+def test_inneros_provider_token_bridge_returns_only_ephemeral_token(monkeypatch, tmp_path) -> None:
+    python_path = tmp_path / "python3"
+    python_path.write_text("", encoding="utf-8")
+    platform_path = tmp_path / "platform"
+    platform_path.mkdir()
+    monkeypatch.setenv("VOICEOPS_INNEROS_PROVIDER_PYTHON", str(python_path))
+    monkeypatch.setenv("VOICEOPS_INNEROS_PLATFORM_PATH", str(platform_path))
+    captured = {}
+
+    def fake_runner(argv, **kwargs):
+        captured["argv"] = argv
+        captured["kwargs"] = kwargs
+        return SimpleNamespace(
+            returncode=0,
+            stdout=json.dumps({"ok": True, "token": "temporary-browser-token", "expires_in_seconds": 120}) + "\n",
+            stderr="",
+        )
+
+    result = mint_voice_agent_token_from_inneros_provider(runner=fake_runner)
+    assert result == {
+        "token": "temporary-browser-token",
+        "expires_in_seconds": 120,
+        "auth_source": "inneros_owner_vault",
+    }
+    assert captured["argv"][0] == str(python_path)
+    assert captured["argv"][-2:] == [str(platform_path), "120"]
+    assert "assemblyai_api_key" not in " ".join(captured["argv"]).lower()
+
+
+def test_inneros_provider_token_bridge_fails_closed_without_paths(monkeypatch) -> None:
+    monkeypatch.delenv("VOICEOPS_INNEROS_PROVIDER_PYTHON", raising=False)
+    monkeypatch.delenv("VOICEOPS_INNEROS_PLATFORM_PATH", raising=False)
+    try:
+        mint_voice_agent_token_from_inneros_provider()
+    except ValueError as exc:
+        assert "not configured" in str(exc)
+    else:
+        raise AssertionError("provider bridge must fail closed without explicit runtime paths")
