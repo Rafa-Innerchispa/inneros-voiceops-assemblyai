@@ -15,7 +15,7 @@ class SharedMemoryBridge:
     """Optional bridge to Personal Brain/Cognee with an honest synthetic fallback."""
 
     mode: str = field(default_factory=lambda: os.getenv("VOICEOPS_SHARED_MEMORY_MODE", "synthetic").strip().lower())
-    base_url: str = field(default_factory=lambda: os.getenv("PERSONAL_BRAIN_URL", "http://127.0.0.1:8230").rstrip("/"))
+    base_url: str = field(default_factory=lambda: os.getenv("PERSONAL_BRAIN_URL", "http://127.0.0.1:8231").rstrip("/"))
     timeout_seconds: float = 0.8
     _journal: list[dict[str, object]] = field(default_factory=list)
 
