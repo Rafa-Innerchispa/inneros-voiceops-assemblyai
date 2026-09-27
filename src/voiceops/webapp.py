@@ -16,8 +16,11 @@ from urllib.request import Request, urlopen
 
 from .adapters.local_amd import LocalAMDReasoner
 from .adapters.local_qwen import LocalQwenReasoner
+from .approval import ExplicitApprovalGate
 from .audit import replay_summary
+from .execution_permit import VoiceExecutionPermitManager
 from .gateway import VoiceGateway
+from .inneros_system_bridge import InnerOSSystemBridge
 from .shared_memory import SharedMemoryBridge
 
 
@@ -48,11 +51,19 @@ class DemoSessionStore:
         self,
         gateway_factory: Callable[[], VoiceGateway] | None = None,
         memory_bridge: SharedMemoryBridge | None = None,
+        system_bridge: InnerOSSystemBridge | None = None,
     ) -> None:
         self._lock = threading.Lock()
         self._gateway_factory = gateway_factory or VoiceGateway
         self._gateway = self._gateway_factory()
         self._memory_bridge = memory_bridge or SharedMemoryBridge()
+        self._system_bridge = system_bridge or InnerOSSystemBridge()
+        self._approval_gate = ExplicitApprovalGate()
+        self._live_permits = VoiceExecutionPermitManager(ttl_seconds=45.0)
+        self._pending_live_action: dict[str, Any] | None = None
+        self._live_action_result: dict[str, Any] | None = None
+        self._live_approval: dict[str, Any] | None = None
+        self._last_system_query: dict[str, Any] | None = None
         self._last_result: dict[str, object] | None = None
         self._memory_recall: dict[str, object] | None = None
         self._memory_receipt: dict[str, object] | None = None
@@ -65,6 +76,10 @@ class DemoSessionStore:
             self._memory_recall = None
             self._memory_receipt = None
             self._memory_cross_agent = None
+            self._pending_live_action = None
+            self._live_action_result = None
+            self._live_approval = None
+            self._last_system_query = None
             return self._snapshot_unlocked()
 
     def submit_transcript(self, transcript: str) -> dict[str, Any]:
@@ -183,6 +198,186 @@ class DemoSessionStore:
             state["bridge_event_id"] = event_id
             return state
 
+    def tool_system_query(self, query: str) -> dict[str, Any]:
+        normalized = _normalize_transcript(query)
+        result = self._system_bridge.query(normalized)
+        with self._lock:
+            self._last_system_query = result
+            self._gateway.evidence.add_event(
+                "live_system_query",
+                ok=result.get("ok"),
+                source_truth=result.get("source_truth", "UNVERIFIED"),
+                detected_tools=[item.get("tool") for item in result.get("detected", [])],
+                read_tool_count=len(result.get("results", [])),
+                proposed_write_count=len(result.get("write_proposals", [])),
+                credentials_exposed=False,
+            )
+            correlation_id = self._gateway.evidence.correlation_id
+        result["correlation_id"] = correlation_id
+        result["requires_approval"] = bool(result.get("write_proposals"))
+        if result.get("write_proposals"):
+            result["approval_hint"] = "Say 'Sí, autorizo' / 'Yes, authorize' or press Permit + Act."
+        return result
+
+    def tool_propose_system_action(self, command: str) -> dict[str, Any]:
+        normalized = _normalize_transcript(command)
+        result = self._system_bridge.query(normalized)
+        proposals = list(result.get("write_proposals") or [])
+        protected = list(result.get("protected_proposals") or [])
+        if protected and not proposals:
+            return {
+                "status": "protected",
+                "requires_approval": False,
+                "reason": "dedicated_approval_adapter_required",
+                "protected_proposals": protected,
+                "message": "This system action uses a dedicated safety adapter and cannot be executed through the generic VoiceOps permit.",
+                "production_writes": False,
+            }
+        if not proposals:
+            return {
+                "status": "no_action_detected",
+                "requires_approval": False,
+                "live_result": result,
+                "message": "No approval-gated live action was detected.",
+                "production_writes": False,
+            }
+        proposal = dict(proposals[0])
+        with self._lock:
+            if self._gateway.pending_approval or self._pending_live_action is not None:
+                raise ValueError("an approval is already pending")
+            self._pending_live_action = proposal
+            self._live_action_result = None
+            self._live_approval = None
+            self._last_system_query = result
+            self._gateway.evidence.add_event(
+                "live_action_proposed",
+                tool=proposal.get("tool"),
+                args=proposal.get("args"),
+                source_truth="LIVE",
+                execution_blocked=True,
+            )
+            correlation_id = self._gateway.evidence.correlation_id
+        return {
+            "status": "approval_required",
+            "requires_approval": True,
+            "proposal": proposal,
+            "correlation_id": correlation_id,
+            "approval_hint": "Say 'Sí, autorizo' / 'Yes, authorize' or press Permit + Act.",
+            "production_writes": False,
+        }
+
+    def _approve_live_action(self, authorization_phrase: str) -> dict[str, Any]:
+        normalized = _normalize_transcript(authorization_phrase)
+        with self._lock:
+            proposal = dict(self._pending_live_action or {})
+            if not proposal:
+                if self._live_action_result:
+                    return {
+                        "status": "already_completed",
+                        "requires_approval": False,
+                        "approval": self._live_approval,
+                        "action": self._live_action_result,
+                        "correlation_id": self._gateway.evidence.correlation_id,
+                        "production_writes": True,
+                    }
+                raise ValueError("no action is awaiting approval")
+            decision = self._approval_gate.decide(normalized)
+            self._live_approval = {"approved": decision.approved, "reason": decision.reason, "phrase": authorization_phrase}
+            self._gateway.evidence.add_event(
+                "live_action_approval",
+                approved=decision.approved,
+                reason=decision.reason,
+                transcript_persisted=False,
+            )
+            if not decision.approved:
+                return {
+                    "status": "blocked",
+                    "requires_approval": True,
+                    "approval": self._live_approval,
+                    "proposal": proposal,
+                    "reason": decision.reason,
+                    "approval_hint": "Say 'Sí, autorizo' / 'Yes, authorize' or press Permit + Act.",
+                    "production_writes": False,
+                }
+            source_event_id = f"inneros:{proposal.get('tool')}"
+            action_type = str(proposal.get("tool") or "inneros_action")
+            state_snapshot = {"proposal": proposal, "query": self._last_system_query.get("original_query") if self._last_system_query else None}
+            permit = self._live_permits.issue(
+                session_id=self._gateway.session_id,
+                source_event_id=source_event_id,
+                action_type=action_type,
+                approval_transcript=normalized,
+                proposal=proposal,
+                state_snapshot=state_snapshot,
+            )
+            allowed, reason, consumed = self._live_permits.consume(
+                permit.permit_id,
+                session_id=self._gateway.session_id,
+                source_event_id=source_event_id,
+                action_type=action_type,
+                approval_transcript=normalized,
+                proposal=proposal,
+                state_snapshot=state_snapshot,
+            )
+            if not allowed:
+                return {
+                    "status": "blocked",
+                    "requires_approval": True,
+                    "reason": reason,
+                    "production_writes": False,
+                }
+            self._gateway.evidence.add_event(
+                "live_execution_permit_consumed",
+                permit_id=permit.permit_id,
+                tool=action_type,
+                single_use=True,
+            )
+
+        executed = self._system_bridge.execute(proposal)
+        with self._lock:
+            action = {
+                "action_id": f"live_{int(time.time() * 1000)}",
+                "action_type": action_type,
+                "status": "completed" if executed.get("ok") else "failed",
+                "details": {
+                    "tool": action_type,
+                    "args": proposal.get("args"),
+                    "result": executed.get("result"),
+                    "source_truth": executed.get("source_truth"),
+                    "permit_id": consumed.permit_id if consumed else permit.permit_id,
+                },
+            }
+            self._live_action_result = action
+            self._pending_live_action = None
+            self._gateway.evidence.add_event(
+                "live_action_executed",
+                action_id=action["action_id"],
+                tool=action_type,
+                ok=executed.get("ok"),
+                source_truth=executed.get("source_truth"),
+                permit_id=permit.permit_id,
+            )
+            correlation_id = self._gateway.evidence.correlation_id
+
+        if executed.get("ok"):
+            receipt = self._memory_bridge.remember_verified(
+                correlation_id=correlation_id,
+                summary=f"Live InnerOS action {action_type} completed with explicit human approval.",
+                evidence_ref=f"evidence://voiceops/{correlation_id}/{action['action_id']}",
+                source_truth="LIVE",
+                verification_passed=True,
+            )
+            with self._lock:
+                self._memory_receipt = receipt
+        return {
+            "status": action["status"],
+            "requires_approval": False,
+            "approval": self._live_approval,
+            "action": action,
+            "correlation_id": correlation_id,
+            "production_writes": bool(executed.get("ok")),
+        }
+
     def tool_inspect(self, intent: str) -> dict[str, Any]:
         normalized = _normalize_transcript(intent)
         duplicate = False
@@ -239,6 +434,11 @@ class DemoSessionStore:
         }
 
     def tool_approve(self, authorization_phrase: str) -> dict[str, Any]:
+        with self._lock:
+            has_live_pending = self._pending_live_action is not None
+            has_live_completed = self._live_action_result is not None and not self._gateway.pending_approval
+        if has_live_pending or has_live_completed:
+            return self._approve_live_action(authorization_phrase)
         duplicate = False
         try:
             state = self.approve_pending(authorization_phrase)
@@ -280,39 +480,67 @@ class DemoSessionStore:
         action = evidence.action_result
         htr = evidence.htr
 
+        live_proposal = self._pending_live_action
+        live_action = self._live_action_result
+        live_approval = self._live_approval
         return {
-            "mode": "synthetic_demo",
+            "mode": "hybrid_live",
             "reasoning_mode": _reasoning_mode(route),
-            "production_writes": False,
+            "production_writes": bool(live_action and live_action.get("status") == "completed"),
+            "live_system_reads": True,
             "session_id": evidence.session_id,
             "correlation_id": evidence.correlation_id,
-            "pending_approval": self._gateway.pending_approval,
+            "pending_approval": bool(self._gateway.pending_approval or live_proposal),
             "last_result": self._last_result,
+            "live_system": {
+                "bridge": self._system_bridge.status(),
+                "last_query": self._last_system_query,
+            },
             "transcript": evidence.turns[-1].transcript if evidence.turns else None,
             "guardian": guardian,
             "route": route,
-            "proposal": {
-                "action_type": proposal.action_type,
-                "summary": proposal.summary,
-                "requires_approval": proposal.requires_approval,
-                "payload": proposal.payload,
-            }
-            if proposal
-            else None,
-            "approval": {
-                "approved": approval.approved,
-                "reason": approval.reason,
-            }
-            if approval
-            else None,
-            "action": {
-                "action_id": action.action_id,
-                "action_type": action.action_type,
-                "status": action.status,
-                "details": action.details,
-            }
-            if action
-            else None,
+            "proposal": (
+                {
+                    "action_type": str(live_proposal.get("tool") or "live_action"),
+                    "summary": f"Execute live InnerOS tool {live_proposal.get('tool')}",
+                    "requires_approval": True,
+                    "payload": dict(live_proposal.get("args") or {}),
+                }
+                if live_proposal
+                else (
+                    {
+                        "action_type": proposal.action_type,
+                        "summary": proposal.summary,
+                        "requires_approval": proposal.requires_approval,
+                        "payload": proposal.payload,
+                    }
+                    if proposal
+                    else None
+                )
+            ),
+            "approval": (
+                live_approval
+                if live_approval
+                else (
+                    {"approved": approval.approved, "reason": approval.reason}
+                    if approval
+                    else None
+                )
+            ),
+            "action": (
+                live_action
+                if live_action
+                else (
+                    {
+                        "action_id": action.action_id,
+                        "action_type": action.action_type,
+                        "status": action.status,
+                        "details": action.details,
+                    }
+                    if action
+                    else None
+                )
+            ),
             "htr": {
                 "manual_seconds": htr.manual_seconds,
                 "human_active_seconds": htr.human_active_seconds,
@@ -516,6 +744,7 @@ class VoiceOpsHandler(BaseHTTPRequestHandler):
                     ),
                     "guardian_voice_bridge_enabled": bool(self.server.bridge_token) or self._loopback_bridge_allowed(),  # type: ignore[attr-defined]
                     "guardian_voice_bridge_mode": "token" if self.server.bridge_token else ("loopback_only" if self._loopback_bridge_allowed() else "disabled"),  # type: ignore[attr-defined]
+                    "live_system_bridge": self.store.snapshot().get("live_system", {}).get("bridge", {}),
                     "production_writes": False,
                 }
             )
@@ -578,6 +807,14 @@ class VoiceOpsHandler(BaseHTTPRequestHandler):
                 state["assemblyai_voice_agent_enabled"] = bool(self.server.live_voice_enabled)  # type: ignore[attr-defined]
                 state["deployment"] = self.server.deployment  # type: ignore[attr-defined]
                 self._send_json(state)
+                return
+            if self.path == "/api/tool/system-query":
+                payload = self._read_json()
+                self._send_json(self.store.tool_system_query(str(payload.get("query") or "")))
+                return
+            if self.path == "/api/tool/propose-system-action":
+                payload = self._read_json()
+                self._send_json(self.store.tool_propose_system_action(str(payload.get("command") or "")))
                 return
             if self.path == "/api/tool/inspect-and-propose":
                 payload = self._read_json()

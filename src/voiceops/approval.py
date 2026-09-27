@@ -20,16 +20,29 @@ class ExplicitApprovalGate:
         "yes",
         "yes proceed",
         "yes authorize",
+        "yes authorize it",
+        "authorize",
+        "authorize it",
+        "approve",
+        "approve it",
         "approved",
         "proceed",
+        "go ahead",
         "si",
         "si autorizo",
+        "si autoriza",
         "si procede",
+        "autorizar",
+        "autoriza",
         "autorizo",
+        "autorizado",
+        "aprobar",
+        "aprueba",
         "apruebo",
+        "adelante",
         "adelante autorizado",
     }
-    _approval_verbs = {"authorize", "approve", "autorizo", "apruebo"}
+    _approval_verbs = {"authorize", "approve", "autorizar", "autoriza", "autorizo", "autorizado", "aprobar", "aprueba", "apruebo"}
     _negations = {"no", "not", "dont", "do not", "cancel", "stop", "cancela", "deten"}
 
     def decide(self, phrase: str) -> ApprovalDecision:

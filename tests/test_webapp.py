@@ -11,7 +11,7 @@ from voiceops.webapp import (
 def test_web_demo_starts_safe_and_empty() -> None:
     store = DemoSessionStore()
     state = store.snapshot()
-    assert state["mode"] == "synthetic_demo"
+    assert state["mode"] == "hybrid_live"
     assert state["production_writes"] is False
     assert state["proposal"] is None
     assert state["action"] is None
@@ -196,3 +196,89 @@ def test_inneros_provider_token_bridge_fails_closed_without_paths(monkeypatch) -
         assert "not configured" in str(exc)
     else:
         raise AssertionError("provider bridge must fail closed without explicit runtime paths")
+
+
+class _FakeSystemBridge:
+    def __init__(self):
+        self.executed = []
+
+    def status(self):
+        return {"ok": True, "configured": True, "provider": "inneros-voice-mcp", "home_assistant_live": True}
+
+    def query(self, text):
+        if "sirena" in text.lower():
+            return {
+                "ok": True,
+                "source_truth": "LIVE",
+                "results": [{"tool": "alarm_intelbras_status", "result": {"ok": True}}],
+                "write_proposals": [],
+                "protected_proposals": [{"tool": "ha_call_service", "args": {}, "reason": "dedicated_approval_adapter_required"}],
+                "detected": [{"tool": "alarm_intelbras_status", "args": {}}],
+                "formatted": "Alarm status live.",
+                "original_query": text,
+            }
+        if any(token in text.lower() for token in ("apaga", "turn off")):
+            return {
+                "ok": True,
+                "source_truth": "LIVE",
+                "results": [],
+                "write_proposals": [{"tool": "ha_turn_off_light", "args": {"name_or_entity": "estudio"}}],
+                "protected_proposals": [],
+                "detected": [{"tool": "ha_turn_off_light", "args": {"name_or_entity": "estudio"}}],
+                "formatted": "",
+                "original_query": text,
+            }
+        return {
+            "ok": True,
+            "source_truth": "LIVE",
+            "results": [{"tool": "ha_home_status", "result": {"ok": True, "summary": "2 cameras, lights available"}}],
+            "write_proposals": [],
+            "protected_proposals": [],
+            "detected": [{"tool": "ha_home_status", "args": {}}],
+            "formatted": "Home Assistant live: 2 cameras, lights available.",
+            "original_query": text,
+        }
+
+    def execute(self, proposal):
+        self.executed.append(proposal)
+        return {"ok": True, "source_truth": "LIVE", "result": {"ok": True, "service": "turn_off"}}
+
+
+def test_live_system_query_is_real_time_read_only_and_does_not_require_approval() -> None:
+    store = DemoSessionStore(system_bridge=_FakeSystemBridge())
+    result = store.tool_system_query("¿Cómo está Home Assistant?")
+    assert result["ok"] is True
+    assert result["source_truth"] == "LIVE"
+    assert result["requires_approval"] is False
+    assert "Home Assistant live" in result["formatted"]
+
+
+def test_live_system_action_requires_explicit_voice_or_button_approval() -> None:
+    bridge = _FakeSystemBridge()
+    store = DemoSessionStore(system_bridge=bridge)
+    proposed = store.tool_propose_system_action("Apaga la luz del estudio")
+    assert proposed["requires_approval"] is True
+    assert bridge.executed == []
+
+    blocked = store.tool_approve("si crees que hace falta")
+    assert blocked["status"] == "blocked"
+    assert blocked["requires_approval"] is True
+    assert bridge.executed == []
+
+    completed = store.tool_approve("autorizar")
+    assert completed["status"] == "completed"
+    assert completed["requires_approval"] is False
+    assert completed["action"]["status"] == "completed"
+    assert bridge.executed[0]["tool"] == "ha_turn_off_light"
+
+    duplicate = store.tool_approve("Yes, authorize")
+    assert duplicate["status"] == "already_completed"
+    assert len(bridge.executed) == 1
+
+
+def test_protected_live_action_does_not_fall_through_generic_permit() -> None:
+    store = DemoSessionStore(system_bridge=_FakeSystemBridge())
+    proposed = store.tool_propose_system_action("Activa la sirena")
+    assert proposed["status"] == "protected"
+    assert proposed["requires_approval"] is False
+    assert proposed["reason"] == "dedicated_approval_adapter_required"

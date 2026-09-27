@@ -20,7 +20,7 @@
       <div class="judge-badges">
         <span id="deploymentBadge" class="badge deployment-badge"><span class="badge-dot"></span>DETECTING RUNTIME</span>
         <span class="badge badge-local">LOCAL-FIRST</span>
-        <span class="badge">NO PROD WRITES</span>
+        <span class="badge">LIVE READS · APPROVAL-GATED ACTIONS</span>
       </div>
     </header>
 
@@ -29,7 +29,15 @@
         <div class="hero-kicker">ASSEMBLYAI VOICE AGENT HACKATHON · 2026</div>
         <h1>Governed voice execution.</h1>
         <p>Speak naturally. InnerOS recalls context, reasons locally, asks for permission, acts once, verifies the result and keeps the proof.</p>
-        <p class="hero-proofline"><strong>ONE PRODUCT · TWO DEPLOYMENT PLANES</strong><br>AssemblyAI realtime voice · Personal Brain / Cognee verified memory · Google Cloud Run or Sovereign Local execution with AMD / Qwen local inference.</p>
+        <p class="hero-proofline"><strong>ONE VOICE · REAL INNEROS TOOLS</strong><br>Realtime voice can read connected systems immediately. Any live change is held behind explicit voice approval or the Permit + Act control.</p>
+        <p class="deployment-proof"><strong>ONE PRODUCT · TWO DEPLOYMENT PLANES</strong><br>Google Cloud Run · Sovereign Local · AMD / Qwen local.</p>
+        <div class="connection-matrix" aria-label="Live VoiceOps connections">
+          <div><span>VOICE</span><strong>AssemblyAI</strong><b id="connAssembly">CHECK</b></div>
+          <div><span>MEMORY</span><strong>Personal Brain / Cognee</strong><b id="connMemory">CHECK</b></div>
+          <div><span>SYSTEM</span><strong>Home Assistant + MCP</strong><b id="connSystem">CHECK</b></div>
+          <div><span>REASON</span><strong>Local Qwen</strong><b id="connReason">CHECK</b></div>
+          <div><span>EVENTS</span><strong>Physical Guardian</strong><b id="connGuardian">CHECK</b></div>
+        </div>
         <div class="judge-runtime-line">
           <span class="runtime-pulse"></span>
           <div>
@@ -63,14 +71,17 @@
         <button id="orbitRecall" class="orbit-node node-memory" type="button" aria-label="Recall verified context">
           <span class="orbit-offset"><span class="orbit-card"><span class="orbit-index">02</span><strong>RECALL</strong><small>verified context</small></span></span>
         </button>
-        <button id="orbitReason" class="orbit-node node-reason" type="button" aria-label="Run local reasoning">
-          <span class="orbit-offset"><span class="orbit-card"><span class="orbit-index">03</span><strong>REASON</strong><small>local-first</small></span></span>
+        <button id="orbitSystem" class="orbit-node node-system" type="button" aria-label="Query live InnerOS systems">
+          <span class="orbit-offset"><span class="orbit-card"><span class="orbit-index">03</span><strong>SYSTEM</strong><small>HA + MCP</small></span></span>
+        </button>
+        <button id="orbitReason" class="orbit-node node-reason" type="button" aria-label="Inspect local reasoning">
+          <span class="orbit-offset"><span class="orbit-card"><span class="orbit-index">04</span><strong>REASON</strong><small>local Qwen</small></span></span>
         </button>
         <button id="orbitPermit" class="orbit-node node-permit" type="button" aria-label="Permit and act">
-          <span class="orbit-offset"><span class="orbit-card"><span class="orbit-index">04</span><strong>PERMIT + ACT</strong><small>explicit approval</small></span></span>
+          <span class="orbit-offset"><span class="orbit-card"><span class="orbit-index">05</span><strong>PERMIT</strong><small>voice or click</small></span></span>
         </button>
         <button id="orbitProof" class="orbit-node node-proof" type="button" aria-label="Verify evidence and replay">
-          <span class="orbit-offset"><span class="orbit-card"><span class="orbit-index">05</span><strong>VERIFY</strong><small>evidence + replay</small></span></span>
+          <span class="orbit-offset"><span class="orbit-card"><span class="orbit-index">06</span><strong>VERIFY</strong><small>proof + replay</small></span></span>
         </button>
 
         <div class="live-readout">

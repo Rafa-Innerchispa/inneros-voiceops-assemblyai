@@ -12,7 +12,8 @@ const els = {
   timeline: $("timeline"), htrBox: $("htrBox"), sessionId: $("sessionId"), correlationId: $("correlationId"),
   liveVoiceBtn: $("liveVoiceBtn"), stopVoiceBtn: $("stopVoiceBtn"), voiceAgentStatus: $("voiceAgentStatus"), agentTranscript: $("agentTranscript"),
   coreActionLabel: $("coreActionLabel"),
-  orbitAssembly: $("orbitAssembly"), orbitRecall: $("orbitRecall"), orbitReason: $("orbitReason"), orbitPermit: $("orbitPermit"), orbitProof: $("orbitProof"),
+  orbitAssembly: $("orbitAssembly"), orbitRecall: $("orbitRecall"), orbitSystem: $("orbitSystem"), orbitReason: $("orbitReason"), orbitPermit: $("orbitPermit"), orbitProof: $("orbitProof"),
+  connAssembly: $("connAssembly"), connMemory: $("connMemory"), connSystem: $("connSystem"), connReason: $("connReason"), connGuardian: $("connGuardian"),
   memoryBeforeTruth: $("memoryBeforeTruth"), memoryBeforeProvider: $("memoryBeforeProvider"), memoryBeforeCount: $("memoryBeforeCount"), memoryBeforeSummary: $("memoryBeforeSummary"),
   memoryAfterTruth: $("memoryAfterTruth"), memoryAfterProvider: $("memoryAfterProvider"), memoryAfterCount: $("memoryAfterCount"), memoryAfterSummary: $("memoryAfterSummary"),
   flowVoice: $("flowVoice"), flowMemory: $("flowMemory"), flowReason: $("flowReason"), flowApprove: $("flowApprove"), flowAct: $("flowAct"), flowVerify: $("flowVerify"), flowShare: $("flowShare"),
@@ -42,6 +43,16 @@ function row(label, value) {
   right.textContent = value ?? "—";
   div.append(left, right);
   return div;
+}
+
+function renderConnections(state = {}) {
+  if (els.connAssembly) els.connAssembly.textContent = state.assemblyai_voice_agent_enabled ? "LIVE" : "OFF";
+  const memoryMode = state.shared_memory?.bridge?.mode || "unknown";
+  if (els.connMemory) els.connMemory.textContent = memoryMode === "live" ? "LIVE" : memoryMode.toUpperCase();
+  const systemOk = Boolean(state.live_system?.bridge?.ok);
+  if (els.connSystem) els.connSystem.textContent = systemOk ? "LIVE" : "CHECK";
+  if (els.connReason) els.connReason.textContent = state.deployment?.local_inference ? "LOCAL" : "SAFE";
+  if (els.connGuardian) els.connGuardian.textContent = "EVENT BRIDGE";
 }
 
 function renderDeployment(profile = {}) {
@@ -168,9 +179,10 @@ function renderMemory(state) {
   setFlow(els.flowShare, Boolean(cross.status), Boolean(cross.count));
   setOrbit(els.orbitAssembly, Boolean(state.transcript) || voiceAgent.ready, Boolean(state.transcript));
   setOrbit(els.orbitRecall, Boolean(before.status), Boolean(before.count));
+  setOrbit(els.orbitSystem, Boolean(state.live_system?.last_query), Boolean(state.live_system?.last_query?.ok));
   setOrbit(els.orbitReason, Boolean(state.route && Object.keys(state.route).length), Boolean(state.proposal));
   setOrbit(els.orbitPermit, Boolean(state.pending_approval || state.approval), Boolean(state.action));
-  setOrbit(els.orbitProof, Boolean(state.action || writeback.status), Boolean(writeback.verification_passed));
+  setOrbit(els.orbitProof, Boolean(state.action || writeback.status), Boolean(writeback.verification_passed || state.action));
 }
 
 function renderProposal(state) {
@@ -182,8 +194,10 @@ function renderProposal(state) {
   }
   els.proposalEmpty.classList.add("hidden"); els.proposalData.classList.remove("hidden");
   els.proposalData.replaceChildren(
-    row("Action", proposal.action_type), row("Priority", proposal.payload?.priority || "—"),
-    row("Reason", proposal.payload?.reason_code || "—"), row("Approval", proposal.requires_approval ? "REQUIRED" : "NOT REQUIRED")
+    row("Action", proposal.action_type),
+    row("Target", proposal.payload?.name_or_entity || proposal.payload?.entity_id || proposal.payload?.scene || proposal.payload?.priority || "—"),
+    row("Reason", proposal.payload?.reason_code || (proposal.action_type?.startsWith("ha_") || proposal.action_type?.startsWith("dmx_") ? "LIVE SYSTEM ACTION" : "—")),
+    row("Approval", proposal.requires_approval ? "REQUIRED" : "NOT REQUIRED")
   );
   if (state.action) {
     setState(els.actionState, "EXECUTED", "success"); els.actionResult.classList.remove("hidden");
@@ -220,6 +234,7 @@ function renderTimeline(items = []) {
 function render(state) {
   currentState = state;
   renderDeployment(state.deployment);
+  renderConnections(state);
   els.sessionId.textContent = state.session_id; els.correlationId.textContent = state.correlation_id;
   if (!voiceAgent.liveTranscriptActive) els.transcript.textContent = state.transcript || "No transcript yet.";
   if (state.transcript && !voiceAgent.liveTranscriptActive) setState(els.voiceState, "FINAL TRANSCRIPT", "ready");
@@ -229,9 +244,11 @@ function render(state) {
   if (state.action) els.demoStatus.textContent = `Completed: ${state.action.action_id}. Evidence sealed for replay.`;
   else if (state.approval && !state.approval.approved) els.demoStatus.textContent = "Ambiguous authorization was blocked. Explicit approval is still required.";
   else if (state.pending_approval) {
-    const provider = state.route?.provider === "local-amd-5" ? "AMD .5" : "the demo reasoner";
-    els.demoStatus.textContent = `${provider} proposal is ready. InnerOS is waiting for explicit human approval.`;
-  } else els.demoStatus.textContent = state.proposal ? "Action proposed." : "Ready for an operational intent.";
+    const isLiveAction = String(state.proposal?.action_type || "").startsWith("ha_") || String(state.proposal?.action_type || "").startsWith("dmx_");
+    els.demoStatus.textContent = isLiveAction
+      ? "Live action ready. Say “Sí, autorizo” / “Yes, authorize” or press Permit + Act."
+      : "Proposal ready. InnerOS is waiting for explicit human approval.";
+  } else els.demoStatus.textContent = state.proposal ? "Action proposed." : "Ready for a live system question or action.";
   if (state.htr) {
     const saved = Math.max(0, Math.round(state.htr.saved_seconds));
     els.htrBox.innerHTML = `<strong>HTR ${state.htr.classification}</strong> · ${saved}s returned · VoiceOps active ${state.htr.human_active_seconds.toFixed(2)}s`;
@@ -249,7 +266,13 @@ async function postTranscript(path, transcript) {
 }
 
 els.runBtn.addEventListener("click", () => postTranscript("/api/intent", "Ralphi, revisa la incidencia del acceso norte y abre una orden tecnica si corresponde."));
-els.approveBtn.addEventListener("click", () => postTranscript("/api/approve", "Si, autorizo."));
+els.approveBtn.addEventListener("click", async () => {
+  try {
+    const result = await api("/api/tool/approve-pending", {method: "POST", body: JSON.stringify({authorization_phrase: "Sí, autorizo. Yes, authorize."})});
+    await refresh();
+    els.agentTranscript.textContent = result.action ? `Authorized · ${result.action.action_id} · ${result.action.status}` : "Authorization processed.";
+  } catch (err) { els.demoStatus.textContent = `Error: ${err.message}`; }
+});
 els.ambiguousBtn.addEventListener("click", () => postTranscript("/api/approve", "Si crees que hace falta."));
 els.resetBtn.addEventListener("click", async () => render(await api("/api/reset", {method: "POST", body: "{}"})));
 els.evidenceBtn.addEventListener("click", async () => { els.dialogTitle.textContent = "Decision Evidence Bundle"; els.jsonOutput.textContent = JSON.stringify(await api("/api/evidence"), null, 2); els.dialog.showModal(); });
@@ -262,9 +285,19 @@ const voiceAgent = {
   liveTranscriptActive: false
 };
 
+const systemStatusTool = {
+  type: "function", name: "query_live_inneros", execution_mode: "interactive",
+  description: "Use this for current or real-time questions about InnerOS, Home Assistant, cameras, lights, switches, servers, infrastructure, clients, tasks, DMX, alarm status, or any connected system. This tool is read-only. Never invent a device, incident, or current state.",
+  parameters: {type: "object", properties: {}, required: []}
+};
+const systemActionTool = {
+  type: "function", name: "propose_live_inneros_action", execution_mode: "interactive",
+  description: "Use this when the user asks to change a real connected system, such as turning a Home Assistant light on/off or applying a DMX scene. This only proposes the exact action and MUST NOT execute it. After a proposal, ask for explicit approval by voice or the Permit + Act planet.",
+  parameters: {type: "object", properties: {}, required: []}
+};
 const inspectTool = {
   type: "function", name: "inspect_and_propose_action", execution_mode: "interactive",
-  description: "Call this whenever the user asks to review, inspect, check, open, create, or act on an operational incident, access point, device, or work order. Do not answer operational requests from memory. This tool only inspects and proposes; it never executes the consequential action.",
+  description: "Judge-safe synthetic work-order fallback only. Do not use this for normal live voice questions or real devices. Use query_live_inneros for real current state.",
   parameters: {type: "object", properties: {}, required: []}
 };
 const recallTool = {
@@ -281,32 +314,33 @@ const approveTool = {
 function voiceAgentConfig() {
   return {type: "session.update", session: {
     system_prompt: [
-      "Eres la interfaz de voz de InnerOS VoiceOps. Habla en español latinoamericano natural, claro y conversacional, y responde de forma breve.",
-      "Si el usuario pregunta qué recuerda el sistema, historial o memoria, llama a recall_verified_context y usa únicamente el resultado real de esa herramienta.",
-      "No digas que no tienes acceso a memoria si la herramienta devolvió resultados. Si devuelve cero resultados, di que no encontró memoria verificada para esa consulta.",
-      "No inventes ni simules estado operativo. Para cualquier solicitud de inspección o acción operativa debes llamar a inspect_and_propose_action.",
-      "Ejemplo: Usuario: 'revisa la incidencia del acceso norte'. Tú: [call inspect_and_propose_action].",
-      "Cuando tengas dudas, llama la herramienta; responder desde memoria es incorrecto."
+      "You are the InnerOS VoiceOps voice interface. Reply in the same language as the user's latest turn. Support natural English and Latin American Spanish, including code-switching.",
+      "For CURRENT or REAL-TIME state of InnerOS, Home Assistant, cameras, lights, switches, servers, clients, tasks, DMX or alarm status, call query_live_inneros. Never invent a device, incident, or system state.",
+      "For remembered or historical verified outcomes, call recall_verified_context.",
+      "For a request that CHANGES a connected live system, call propose_live_inneros_action. Never claim the change happened until approve_pending_action returns a completed live result.",
+      "When an action is pending, clearly tell the user they can say 'Sí, autorizo' / 'Yes, authorize' OR press the Permit + Act planet.",
+      "Do not use the synthetic work-order fallback during normal live voice conversation.",
+      "Keep answers short, concrete, and based on tool results."
     ].join(" "),
-    greeting: "VoiceOps está listo. Dime qué quieres revisar.",
+    greeting: "VoiceOps ready. Puedes hablarme en español or English.",
     output: {voice: "diego", format: {encoding: "audio/pcm"}},
     input: {
       format: {encoding: "audio/pcm"},
-      keyterms: ["InnerOS", "Ralphi", "acceso norte", "orden técnica", "sí autorizo", "sí apruebo"],
-      language_codes: ["es"]
+      keyterms: ["InnerOS", "Ralphi", "Home Assistant", "AssemblyAI", "Cognee", "DMX", "Intelbras", "sí autorizo", "yes authorize"],
+      language_codes: ["en", "es"]
     },
-    tools: [recallTool, inspectTool]
+    tools: [systemStatusTool, recallTool, systemActionTool]
   }};
 }
 
 function phaseUpdate(phase) {
   if (phase === "approval") return {type: "session.update", session: {
-    system_prompt: "Hay una propuesta pendiente. Explica brevemente el resultado de la herramienta y pide autorización humana explícita. No ejecutes nada todavía. Si la última respuesta del usuario autoriza explícitamente, por ejemplo 'sí, autorizo', llama a approve_pending_action. Ejemplo: Usuario: 'sí, autorizo'. Tú: [call approve_pending_action].",
-    tools: [recallTool, approveTool]
+    system_prompt: "A live action is pending. Reply in the user's language. Explain the exact proposed action and say clearly: you can say 'Sí, autorizo' / 'Yes, authorize' OR press the Permit + Act planet. If the latest user turn explicitly authorizes, including 'autorizar', 'autoriza', 'autorizo', 'authorize' or 'approve', call approve_pending_action. Never claim success before the tool result.",
+    tools: [systemStatusTool, recallTool, approveTool]
   }};
   return {type: "session.update", session: {
-    system_prompt: "La operación gobernada ya terminó. Usa únicamente el resultado de la herramienta para confirmar el estado, el identificador de la orden si existe y que se registró Decision Evidence. Puedes usar recall_verified_context para responder preguntas posteriores de memoria, pero no ejecutes nuevas acciones sin una nueva inspección.",
-    tools: [recallTool]
+    system_prompt: "The governed operation is complete. Reply in the user's language and confirm only what the tool result proves. You may continue with read-only live queries or propose a new live action, which requires a new approval.",
+    tools: [systemStatusTool, recallTool, systemActionTool]
   }};
 }
 
@@ -366,6 +400,8 @@ function flushVoicePlayback() {
 async function executeVoiceTool(call) {
   const exactUserText = voiceAgent.lastFinalUserTranscript.trim();
   if (!exactUserText) return {error: "no finalized user transcript available for tool binding"};
+  if (call.name === "query_live_inneros") return api("/api/tool/system-query", {method: "POST", body: JSON.stringify({query: exactUserText})});
+  if (call.name === "propose_live_inneros_action") return api("/api/tool/propose-system-action", {method: "POST", body: JSON.stringify({command: exactUserText})});
   if (call.name === "recall_verified_context") return api("/api/tool/recall", {method: "POST", body: JSON.stringify({query: exactUserText})});
   if (call.name === "inspect_and_propose_action") return api("/api/tool/inspect-and-propose", {method: "POST", body: JSON.stringify({intent: exactUserText})});
   if (call.name === "approve_pending_action") return api("/api/tool/approve-pending", {method: "POST", body: JSON.stringify({authorization_phrase: exactUserText})});
@@ -377,13 +413,15 @@ async function flushToolCalls() {
   const calls = voiceAgent.pendingToolCalls.splice(0);
   for (const call of calls) {
     if (call.name === "recall_verified_context") setOrbit(els.orbitRecall, true, false);
-    if (call.name === "inspect_and_propose_action") {
-      setOrbit(els.orbitRecall, true, false);
+    if (call.name === "query_live_inneros") setOrbit(els.orbitSystem, true, false);
+    if (call.name === "propose_live_inneros_action") {
+      setOrbit(els.orbitSystem, true, false);
       setOrbit(els.orbitReason, true, false);
     }
+    if (call.name === "inspect_and_propose_action") setOrbit(els.orbitReason, true, false);
     if (call.name === "approve_pending_action") setOrbit(els.orbitPermit, true, false);
     let result; try { result = await executeVoiceTool(call); await refresh(); } catch (err) { result = {error: err.message}; }
-    if (call.name === "inspect_and_propose_action" && !result.error) {
+    if ((call.name === "propose_live_inneros_action" || call.name === "inspect_and_propose_action") && !result.error) {
       voiceAgent.ws.send(JSON.stringify(phaseUpdate(result.requires_approval ? "approval" : "complete")));
     } else if (call.name === "approve_pending_action") {
       voiceAgent.ws.send(JSON.stringify(phaseUpdate("complete")));
@@ -479,6 +517,15 @@ els.orbitAssembly.addEventListener("click", () => {
     els.agentTranscript.textContent = `AssemblyAI live · session ${voiceAgent.sessionId || "connecting"} · Spanish realtime voice`;
   }
 });
+els.orbitSystem.addEventListener("click", async () => {
+  const query = voiceAgent.lastFinalUserTranscript || currentState?.transcript || "status of Home Assistant, cameras, lights and connected InnerOS systems";
+  setOrbit(els.orbitSystem, true, false);
+  try {
+    const result = await api("/api/tool/system-query", {method: "POST", body: JSON.stringify({query})});
+    await refresh();
+    els.agentTranscript.textContent = result.formatted || (result.ok ? "Live InnerOS query completed." : `System query error · ${result.error || "unknown"}`);
+  } catch (err) { els.agentTranscript.textContent = `System error · ${err.message}`; }
+});
 els.orbitRecall.addEventListener("click", async () => {
   const query = voiceAgent.lastFinalUserTranscript || currentState?.transcript || "últimos resultados operativos verificados de VoiceOps";
   setOrbit(els.orbitRecall, true, false);
@@ -490,20 +537,18 @@ els.orbitRecall.addEventListener("click", async () => {
   } catch (err) { els.agentTranscript.textContent = `Recall error · ${err.message}`; }
 });
 els.orbitReason.addEventListener("click", async () => {
-  const intent = voiceAgent.lastFinalUserTranscript || currentState?.transcript;
-  if (!intent) { els.agentTranscript.textContent = "Habla primero: Reason necesita una intención operativa concreta."; return; }
   setOrbit(els.orbitReason, true, false);
-  try {
-    const result = await api("/api/tool/inspect-and-propose", {method: "POST", body: JSON.stringify({intent})});
-    await refresh();
-    els.agentTranscript.textContent = result.proposal?.summary || "Reason completó la inspección sin proponer una acción.";
-  } catch (err) { els.agentTranscript.textContent = `Reason error · ${err.message}`; }
+  const inference = currentState?.deployment?.inference || "local reasoner";
+  const queryTools = currentState?.live_system?.last_query?.detected?.map((item) => item.tool).join(", ");
+  els.agentTranscript.textContent = queryTools
+    ? `Reason · ${inference} · last live route: ${queryTools}`
+    : `Reason · ${inference} · live state is fetched before consequential actions.`;
 });
 els.orbitPermit.addEventListener("click", async () => {
-  if (!currentState?.pending_approval) { els.agentTranscript.textContent = "Permit está bloqueado: no hay una acción pendiente de autorización."; return; }
+  if (!currentState?.pending_approval) { els.agentTranscript.textContent = "Permit is locked: no action is awaiting approval. / No hay una acción pendiente."; return; }
   setOrbit(els.orbitPermit, true, false);
   try {
-    const result = await api("/api/tool/approve-pending", {method: "POST", body: JSON.stringify({authorization_phrase: "Sí, autorizo desde Permit + Act."})});
+    const result = await api("/api/tool/approve-pending", {method: "POST", body: JSON.stringify({authorization_phrase: "Sí, autorizo. Yes, authorize."})});
     await refresh();
     els.agentTranscript.textContent = result.action ? `Autorizado · ${result.action.action_id} · ${result.action.status}` : "Autorización procesada.";
   } catch (err) { els.agentTranscript.textContent = `Permit error · ${err.message}`; }
