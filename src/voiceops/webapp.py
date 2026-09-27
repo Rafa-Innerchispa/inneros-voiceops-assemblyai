@@ -15,6 +15,7 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 from .adapters.local_amd import LocalAMDReasoner
+from .adapters.local_qwen import LocalQwenReasoner
 from .audit import replay_summary
 from .gateway import VoiceGateway
 from .shared_memory import SharedMemoryBridge
@@ -316,6 +317,8 @@ def _normalize_transcript(transcript: str) -> str:
 def _reasoning_mode(route: dict[str, Any]) -> str:
     if route.get("provider") == "local-amd-5" and route.get("truth") == "LIVE_MODEL_RESPONSE":
         return "amd5_live"
+    if route.get("provider") == "local-intel-4" and route.get("truth") == "LIVE_MODEL_RESPONSE":
+        return "local_qwen_live"
     if route.get("truth") == "SYNTHETIC":
         return "synthetic"
     return "pending"
@@ -329,7 +332,7 @@ def _deployment_profile(reasoner_mode: str) -> dict[str, Any]:
         mode = "sovereign_local"
     elif os.getenv("K_SERVICE"):
         mode = "cloud_run"
-    elif reasoner_mode == "amd5":
+    elif reasoner_mode in {"amd5", "localqwen"}:
         mode = "sovereign_local"
     else:
         mode = "judge_safe"
@@ -350,9 +353,13 @@ def _deployment_profile(reasoner_mode: str) -> dict[str, Any]:
             "label": "SOVEREIGN LOCAL",
             "surface": "On-prem / edge deployment",
             "compute": "Local server",
-            "inference": "AMD / Qwen local" if reasoner_mode == "amd5" else "Local judge-safe fixture",
+            "inference": (
+                "AMD / Qwen local"
+                if reasoner_mode == "amd5"
+                else ("Intel / Qwen local" if reasoner_mode == "localqwen" else "Local judge-safe fixture")
+            ),
             "data_boundary": "Customer-controlled local boundary",
-            "local_inference": reasoner_mode == "amd5",
+            "local_inference": reasoner_mode in {"amd5", "localqwen"},
         }
     return {
         "mode": mode,
@@ -370,6 +377,8 @@ def build_gateway_factory(reasoner_mode: str) -> Callable[[], VoiceGateway]:
         return VoiceGateway
     if reasoner_mode == "amd5":
         return lambda: VoiceGateway(reasoner=LocalAMDReasoner())
+    if reasoner_mode == "localqwen":
+        return lambda: VoiceGateway(reasoner=LocalQwenReasoner())
     raise ValueError(f"unsupported reasoner mode: {reasoner_mode}")
 
 
@@ -666,9 +675,9 @@ def main() -> None:
     )
     parser.add_argument(
         "--reasoner",
-        choices=("synthetic", "amd5"),
+        choices=("synthetic", "amd5", "localqwen"),
         default=os.getenv("VOICEOPS_REASONER", "synthetic"),
-        help="Use offline-safe synthetic reasoning or the existing local AMD .5 runtime.",
+        help="Use synthetic, AMD/Qwen, or the resilient local Intel/Ollama Qwen runtime.",
     )
     parser.add_argument(
         "--enable-live-assemblyai",
