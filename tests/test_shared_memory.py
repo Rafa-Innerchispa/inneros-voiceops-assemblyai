@@ -99,6 +99,7 @@ def test_judge_ui_exposes_truth_labeled_shared_memory_loop() -> None:
     assert ".memory-proof-grid" in css
     assert '<button id="orbitAssembly"' in html
     assert '<button id="orbitRecall"' in html
+    assert '<button id="orbitSystem"' in html
     assert '<button id="orbitReason"' in html
     assert '<button id="orbitPermit"' in html
     assert '<button id="orbitProof"' in html
@@ -108,3 +109,18 @@ def test_judge_ui_exposes_truth_labeled_shared_memory_loop() -> None:
     assert 'button:not(.signal-core):not(.orbit-node):hover:not(:disabled)' in css
     assert ".voice-stage:hover .orbit-node" in css
     assert "@keyframes orbitNodeSpin" in css
+
+
+def test_judge_ui_uses_planet_controls_and_live_connection_matrix() -> None:
+    html = Path("src/voiceops/web/index.html").read_text(encoding="utf-8")
+    css = Path("src/voiceops/web/styles.css").read_text(encoding="utf-8")
+    js = Path("src/voiceops/web/app.js").read_text(encoding="utf-8")
+    assert "connection-matrix" in html
+    assert "Home Assistant + MCP" in html
+    assert "LIVE READS · APPROVAL-GATED ACTIONS" in html
+    assert "border-radius:50%" in css
+    assert "--orbit-radius,218px" in css
+    assert ".node-system" in css
+    assert "query_live_inneros" in js
+    assert "propose_live_inneros_action" in js
+    assert 'language_codes: ["en", "es"]' in js
