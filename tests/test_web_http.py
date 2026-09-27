@@ -75,16 +75,21 @@ def test_browser_voice_agent_uses_progressive_tools_and_spanish_stt_context() ->
     try:
         with urlopen(base + "/app.js", timeout=3) as response:  # noqa: S310 - local ephemeral test server
             script = response.read().decode("utf-8")
-        assert 'tools: [inspectTool]' in script
-        assert 'tools: [approveTool]' in script
-        assert 'tools: []' in script
+        assert 'tools: [recallTool, inspectTool]' in script
+        assert 'tools: [recallTool, approveTool]' in script
+        assert 'tools: [recallTool]' in script
         assert 'language_codes: ["es"]' in script
+        assert 'output: {voice: "diego"' in script
+        assert 'name: "recall_verified_context"' in script
         assert '"sí autorizo"' in script
         assert '"acceso norte"' in script
         assert 'execution_mode: "interactive"' in script
         assert 'handledToolCallIds: new Set()' in script
         assert 'pendingToolCalls.some((call) => call.call_id === msg.call_id)' in script
         assert 'handledToolCallIds.add(call.call_id)' in script
+        recalled = _post_json(base + "/api/tool/recall", {"query": "acceso norte"})
+        assert recalled["count"] >= 1
+        assert recalled["production_writes"] is False
     finally:
         server.shutdown()
         server.server_close()

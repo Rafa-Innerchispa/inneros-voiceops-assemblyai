@@ -15,6 +15,12 @@ def test_synthetic_shared_memory_is_truth_labeled_and_network_free() -> None:
     assert recalled["provider"] == "judge-safe-memory"
 
 
+def test_voiceops_shared_memory_defaults_to_voiceops_receiver_port(monkeypatch) -> None:
+    monkeypatch.delenv("PERSONAL_BRAIN_URL", raising=False)
+    bridge = SharedMemoryBridge(mode="synthetic")
+    assert bridge.base_url == "http://127.0.0.1:8231"
+
+
 def test_shared_memory_refuses_unverified_write() -> None:
     bridge = SharedMemoryBridge(mode="synthetic")
     receipt = bridge.remember_verified(
@@ -91,3 +97,14 @@ def test_judge_ui_exposes_truth_labeled_shared_memory_loop() -> None:
     assert "memoryAfterTruth" in html
     assert "renderMemory" in js
     assert ".memory-proof-grid" in css
+    assert '<button id="orbitAssembly"' in html
+    assert '<button id="orbitRecall"' in html
+    assert '<button id="orbitReason"' in html
+    assert '<button id="orbitPermit"' in html
+    assert '<button id="orbitProof"' in html
+    assert 'output: {voice: "diego"' in js
+    assert 'recall_verified_context' in js
+    assert '/api/tool/recall' in js
+    assert 'button:not(.signal-core):not(.orbit-node):hover:not(:disabled)' in css
+    assert ".voice-stage:hover .orbit-node" in css
+    assert "@keyframes orbitNodeSpin" in css

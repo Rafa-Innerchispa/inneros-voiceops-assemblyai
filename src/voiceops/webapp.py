@@ -197,6 +197,7 @@ class DemoSessionStore:
                     raise
                 state = self._snapshot_unlocked()
                 duplicate = True
+        shared_memory = state.get("shared_memory") if isinstance(state.get("shared_memory"), dict) else {}
         return {
             "status": "already_pending" if duplicate else (
                 state.get("last_result", {}).get("status") if isinstance(state.get("last_result"), dict) else None
@@ -205,7 +206,35 @@ class DemoSessionStore:
             "guardian": state.get("guardian"),
             "route": state.get("route"),
             "proposal": state.get("proposal"),
+            "memory": shared_memory.get("before_action"),
+            "memory_bridge": shared_memory.get("bridge"),
             "correlation_id": state.get("correlation_id"),
+            "production_writes": False,
+        }
+
+    def tool_recall(self, query: str) -> dict[str, Any]:
+        normalized = _normalize_transcript(query)
+        recall = self._memory_bridge.recall(normalized)
+        with self._lock:
+            self._memory_recall = recall
+            self._gateway.evidence.add_event(
+                "shared_memory_recalled",
+                status=recall.get("status"),
+                truth=recall.get("truth"),
+                provider=recall.get("provider"),
+                hit_count=recall.get("count", 0),
+                query_bound=True,
+            )
+            correlation_id = self._gateway.evidence.correlation_id
+        return {
+            "status": recall.get("status"),
+            "truth": recall.get("truth"),
+            "provider": recall.get("provider"),
+            "dataset": recall.get("dataset"),
+            "count": recall.get("count", 0),
+            "hits": recall.get("hits", []),
+            "reason": recall.get("reason"),
+            "correlation_id": correlation_id,
             "production_writes": False,
         }
 
@@ -553,6 +582,10 @@ class VoiceOpsHandler(BaseHTTPRequestHandler):
             if self.path == "/api/tool/inspect-and-propose":
                 payload = self._read_json()
                 self._send_json(self.store.tool_inspect(str(payload.get("intent") or DEFAULT_INTENT)))
+                return
+            if self.path == "/api/tool/recall":
+                payload = self._read_json()
+                self._send_json(self.store.tool_recall(str(payload.get("query") or "latest verified VoiceOps outcomes")))
                 return
             if self.path == "/api/tool/approve-pending":
                 payload = self._read_json()
