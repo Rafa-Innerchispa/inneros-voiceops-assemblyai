@@ -21,6 +21,8 @@
         <span id="deploymentBadge" class="badge deployment-badge"><span class="badge-dot"></span>DETECTING RUNTIME</span>
         <span class="badge badge-local">LOCAL-FIRST</span>
         <span class="badge">LIVE READS · APPROVAL-GATED ACTIONS</span>
+        <button id="consoleLangToggle" class="badge console-lang" type="button">ES</button>
+        <button id="logoutBtn" class="badge console-logout" type="button">LOG OUT</button>
       </div>
     </header>
 
@@ -121,6 +123,49 @@
       <button id="resetBtn" class="ghost">Reset</button>
     </section>
 
+    <section class="authorized-shell" aria-label="Authorized VoiceOps actions">
+      <div class="authorized-head">
+        <div>
+          <div class="step-label">AUTHORIZED ACTIONS</div>
+          <h2>Three governed action families. Everything else fails closed.</h2>
+        </div>
+        <div id="liveIntelSummary" class="live-intel">Loading live InnerOS state…</div>
+      </div>
+      <div class="authorized-grid">
+        <article class="authorized-card">
+          <span class="action-index">01</span>
+          <h3>LIGHTS</h3>
+          <p>Turn one exact Home Assistant light on or off. Approval is still required before execution.</p>
+          <input id="lightTarget" class="action-input" value="luz_estudio_uno" aria-label="Light target">
+          <div class="action-row">
+            <button id="lightOnBtn" class="secondary" type="button">Prepare ON</button>
+            <button id="lightOffBtn" class="secondary" type="button">Prepare OFF</button>
+          </div>
+        </article>
+        <article class="authorized-card">
+          <span class="action-index">02</span>
+          <h3>CAMERA RESTART</h3>
+          <p>Restart only a camera with an explicitly configured safe restart adapter. No adapter means no action.</p>
+          <input id="cameraTarget" class="action-input" placeholder="camera alias" aria-label="Camera target">
+          <button id="cameraRestartBtn" class="secondary action-full" type="button">Prepare restart</button>
+        </article>
+        <article class="authorized-card">
+          <span class="action-index">03</span>
+          <h3>NETWORK RESTART</h3>
+          <p>Restart exactly one allowlisted UniFi device. Connectivity may drop temporarily.</p>
+          <select id="networkTarget" class="action-input" aria-label="Network restart target">
+            <option value="u7">U7 Living</option>
+            <option value="living">Living / U6+</option>
+            <option value="estudio">Estudio</option>
+            <option value="cuarto">Cuarto</option>
+            <option value="cloud gateway">Cloud Gateway Ultra</option>
+          </select>
+          <button id="networkRestartBtn" class="secondary action-full" type="button">Prepare restart</button>
+        </article>
+      </div>
+      <div id="actionPreview" class="action-preview">Select an action to prepare a governed proposal.</div>
+    </section>
+
     <details class="technical-evidence">
       <summary>Technical proof and replay</summary>
       <div class="technical-grid">
@@ -187,5 +232,6 @@
   </dialog>
 
   <script src="/app.js" defer></script>
+  <script src="/console_enhance.js" defer></script>
 </body>
 </html>

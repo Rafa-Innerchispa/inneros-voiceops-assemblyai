@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#05070b">
+  <title>InnerOS VoiceOps</title>
+  <link rel="stylesheet" href="/welcome.css">
+</head>
+<body>
+  <main class="shell">
+    <section class="hero">
+      <div class="brand-row">
+        <div class="mark" aria-hidden="true">
+          <span class="orbit orbit-a"></span>
+          <span class="orbit orbit-b"></span>
+          <span class="core"></span>
+        </div>
+        <div>
+          <p class="eyebrow">INNEROS</p>
+          <h1>VoiceOps</h1>
+        </div>
+        <button class="lang" id="langToggle" type="button">ES</button>
+      </div>
+
+      <div class="voice-field" aria-hidden="true">
+        <span></span><span></span><span></span><span></span><span></span>
+        <span></span><span></span><span></span><span></span><span></span>
+      </div>
+
+      <p class="headline" data-i18n="headline">Governed voice operations for real systems.</p>
+      <p class="subhead" data-i18n="subhead">
+        Live intelligence from InnerOS. Explicit approval before action. Verification after execution.
+      </p>
+
+      <div class="pill-row">
+        <span data-i18n="pillLive">LIVE READS · APPROVAL-GATED ACTIONS</span>
+        <span data-i18n="pillPermit">EXPLICIT PERMIT</span>
+        <span data-i18n="pillVerify">VERIFIED ACTIONS</span>
+      </div>
+
+      <div class="cap-grid">
+        <article>
+          <small>01</small>
+          <strong data-i18n="capReadTitle">Read live state</strong>
+          <p data-i18n="capReadBody">Home Assistant, UniFi, cameras, lights, servers and safe operational context.</p>
+        </article>
+        <article>
+          <small>02</small>
+          <strong data-i18n="capActTitle">Three authorized actions</strong>
+          <p data-i18n="capActBody">Lights, supported camera restart, and exact-target network restart.</p>
+        </article>
+        <article>
+          <small>03</small>
+          <strong data-i18n="capGovTitle">Governed execution</strong>
+          <p data-i18n="capGovBody">Read → Diagnose → Propose → Approve → Execute → Verify.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="auth-card">
+      <div class="status-line">
+        <span class="status-dot"></span>
+        <span id="systemStatus" data-i18n="checking">Checking secure gateway…</span>
+      </div>
+
+      <h2 data-i18n="welcome">Welcome to VoiceOps</h2>
+      <p class="auth-copy" data-i18n="authCopy">
+        Authenticate before entering the operational console.
+      </p>
+
+      <a class="primary oauth" id="oauthButton" href="/api/auth/login">
+        <span data-i18n="oauthButton">Continue with InnerOS OAuth</span>
+        <span>↗</span>
+      </a>
+
+      <div class="divider"><span data-i18n="judgeAccess">JUDGE ACCESS</span></div>
+
+      <form id="judgeForm">
+        <label>
+          <span data-i18n="username">Username</span>
+          <input id="username" name="username" autocomplete="username" required>
+        </label>
+        <label>
+          <span data-i18n="password">Password</span>
+          <input id="password" name="password" type="password" autocomplete="current-password" required>
+        </label>
+        <button class="secondary" type="submit" data-i18n="enterJudge">Enter demo console</button>
+      </form>
+
+      <p class="error" id="errorMessage" role="alert"></p>
+
+      <div class="security-note">
+        <span class="shield">◇</span>
+        <p data-i18n="security">
+          Judge sessions are restricted. No generic admin tools are exposed, and every consequential action still requires an explicit single-use permit.
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <span>InnerOS VoiceOps</span>
+    <span data-i18n="footer">Sovereign local runtime · Central authentication</span>
+  </footer>
+
+  <script src="/welcome.js"></script>
+</body>
+</html>
