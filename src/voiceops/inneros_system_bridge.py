@@ -29,6 +29,8 @@ READ_ONLY_TOOLS = {
     "get_whatsapp_status",
     "list_monitored_emails",
     "ha_list_entities",
+    "ha_list_devices",
+    "ha_list_entity_registry",
     "ha_get_entity",
     "ha_home_status",
     "alarm_intelbras_status",
@@ -39,8 +41,8 @@ READ_ONLY_TOOLS = {
 APPROVAL_GATED_WRITE_TOOLS = {
     "ha_turn_on_light",
     "ha_turn_off_light",
-    "dmx_set_scene",
-    "dmx_blackout",
+    "voiceops_restart_network_device",
+    "voiceops_restart_camera",
 }
 
 PROTECTED_WRITE_TOOLS = {
@@ -55,9 +57,44 @@ PROTECTED_WRITE_TOOLS = {
     "quote_client",
     "invoice_client",
     "technical_report_client",
+    "dmx_set_scene",
+    "dmx_blackout",
+}
+
+NETWORK_RESTART_TARGETS = {
+    "estudio": "button.estudio_restart",
+    "cuarto": "button.cuarto_restart",
+    "living": "button.living_restart",
+    "u6": "button.living_restart",
+    "u7": "button.u7_lite_restart",
+    "u7 living": "button.u7_lite_restart",
+    "gateway": "button.cloud_gateway_ultra_ralphi_restart",
+    "router": "button.cloud_gateway_ultra_ralphi_restart",
+    "cloud gateway": "button.cloud_gateway_ultra_ralphi_restart",
+    "cloud gateway ultra": "button.cloud_gateway_ultra_ralphi_restart",
 }
 
 _CAMERA_RE = re.compile(r"\b(camera|cameras|camara|cámaras|cam|video|videovigilancia)\b", re.I)
+_RESTART_RE = re.compile(r"\b(restart|reboot|reinicia|reiniciar|reinicie|reset)\b", re.I)
+
+
+def _camera_restart_targets() -> dict[str, str]:
+    raw = os.getenv("VOICEOPS_CAMERA_RESTART_TARGETS", "").strip()
+    if not raw:
+        return {}
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError:
+        return {}
+    if not isinstance(payload, dict):
+        return {}
+    result: dict[str, str] = {}
+    for alias, entity_id in payload.items():
+        alias_text = str(alias).strip().lower()
+        entity_text = str(entity_id).strip()
+        if alias_text and re.fullmatch(r"button\.[a-z0-9_]+_restart", entity_text):
+            result[alias_text] = entity_text
+    return result
 
 
 def _normalize_for_broker(text: str) -> str:
@@ -76,6 +113,42 @@ def _normalize_for_broker(text: str) -> str:
     for pattern, replacement in replacements:
         normalized = re.sub(pattern, replacement, normalized, flags=re.I)
     return normalized
+
+
+def _restart_proposal(text: str) -> dict[str, Any] | None:
+    lowered = text.lower()
+    if not _RESTART_RE.search(lowered):
+        return None
+
+    if _CAMERA_RE.search(lowered):
+        matches = [
+            (alias, entity)
+            for alias, entity in _camera_restart_targets().items()
+            if alias in lowered
+        ]
+        if len(matches) == 1:
+            alias, entity = matches[0]
+            return {
+                "tool": "voiceops_restart_camera",
+                "args": {"target": alias, "entity_id": entity},
+            }
+        return None
+
+    matches = [
+        (alias, entity)
+        for alias, entity in NETWORK_RESTART_TARGETS.items()
+        if alias in lowered
+    ]
+    unique: dict[str, str] = {}
+    for alias, entity in matches:
+        unique[entity] = alias
+    if len(unique) != 1:
+        return None
+    entity, alias = next(iter(unique.items()))
+    return {
+        "tool": "voiceops_restart_network_device",
+        "args": {"target": alias, "entity_id": entity},
+    }
 
 
 class InnerOSSystemBridge:
@@ -159,6 +232,17 @@ elif operation == "execute":
     args = dict(payload.get("args") or {})
     if name not in WRITES:
         print(json.dumps({"ok": False, "error": "write_tool_not_approval_gated", "tool": name}))
+    elif name in {"voiceops_restart_network_device", "voiceops_restart_camera"}:
+        entity_id = str(args.get("entity_id") or "")
+        if not re.fullmatch(r"button\.[a-z0-9_]+_restart", entity_id):
+            print(json.dumps({"ok": False, "error": "restart_target_not_allowlisted", "tool": name}))
+        else:
+            result = ex.call_tool(user, "ha_call_service", {
+                "domain": "button",
+                "service": "press",
+                "entity_id": entity_id,
+            })
+            print(json.dumps({"ok": bool(result.get("ok", True)), "tool": name, "args": args, "result": result}, ensure_ascii=False, default=str))
     else:
         result = ex.call_tool(user, name, args)
         print(json.dumps({"ok": bool(result.get("ok", True)), "tool": name, "args": args, "result": result}, ensure_ascii=False, default=str))
@@ -199,6 +283,19 @@ else:
         normalized = _normalize_for_broker(text)
         result = self._run("query", {"text": normalized})
         if result.get("ok"):
+            proposal = _restart_proposal(text)
+            if proposal:
+                result["write_proposals"] = [proposal]
+            elif _RESTART_RE.search(text) and (
+                _CAMERA_RE.search(text)
+                or re.search(r"\b(router|gateway|wifi|wi-fi|ap|access point|punto de acceso|red)\b", text, re.I)
+            ):
+                result["write_proposals"] = []
+                result["restart_target_required"] = True
+                result["restart_message"] = (
+                    "Specify one exact supported target before authorization. "
+                    "Camera restart is only available for explicitly configured safe adapters."
+                )
             result["source_truth"] = "LIVE"
             result["original_query"] = text[:600]
             result["browser_credentials_exposed"] = False
@@ -209,6 +306,16 @@ else:
         args = dict(proposal.get("args") or {})
         if tool not in APPROVAL_GATED_WRITE_TOOLS:
             return {"ok": False, "error": "write_tool_not_approval_gated", "tool": tool}
+
+        if tool == "voiceops_restart_network_device":
+            entity_id = str(args.get("entity_id") or "")
+            if entity_id not in set(NETWORK_RESTART_TARGETS.values()):
+                return {"ok": False, "error": "network_restart_target_not_allowlisted", "tool": tool}
+        elif tool == "voiceops_restart_camera":
+            entity_id = str(args.get("entity_id") or "")
+            if entity_id not in set(_camera_restart_targets().values()):
+                return {"ok": False, "error": "camera_restart_target_not_allowlisted", "tool": tool}
+
         result = self._run("execute", {"tool": tool, "args": args})
         result["source_truth"] = "LIVE" if result.get("ok") else "UNVERIFIED"
         result["browser_credentials_exposed"] = False
@@ -228,6 +335,13 @@ else:
                 "provider": "inneros-voice-mcp",
                 "home_assistant_live": bool(health.get("ok")),
                 "approval_gated_writes": sorted(APPROVAL_GATED_WRITE_TOOLS),
+                "authorized_action_families": [
+                    "LIGHT_CONTROL",
+                    "CAMERA_RESTART",
+                    "NETWORK_RESTART",
+                ],
+                "network_restart_targets": sorted(set(NETWORK_RESTART_TARGETS.values())),
+                "camera_restart_target_count": len(_camera_restart_targets()),
                 "protected_writes": sorted(PROTECTED_WRITE_TOOLS),
             }
         self._health_cache = (now, result)

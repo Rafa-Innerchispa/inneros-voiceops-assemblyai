@@ -11,12 +11,13 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Callable
-from urllib.parse import urlencode
+from urllib.parse import parse_qs, urlencode, urlparse
 from urllib.request import Request, urlopen
 
 from .adapters.local_amd import LocalAMDReasoner
 from .adapters.local_qwen import LocalQwenReasoner
 from .approval import ExplicitApprovalGate
+from .auth import OAUTH_FLOW_COOKIE, SESSION_COOKIE, VoiceOpsAuth
 from .audit import replay_summary
 from .execution_permit import VoiceExecutionPermitManager
 from .gateway import VoiceGateway
@@ -725,6 +726,47 @@ class VoiceOpsHandler(BaseHTTPRequestHandler):
     def web_root(self) -> Path:
         return Path(__file__).with_name("web")
 
+    @property
+    def auth(self) -> VoiceOpsAuth:
+        return self.server.auth  # type: ignore[attr-defined]
+
+    def _cookies(self) -> dict[str, str]:
+        raw = self.headers.get("Cookie", "")
+        result: dict[str, str] = {}
+        for part in raw.split(";"):
+            if "=" not in part:
+                continue
+            key, value = part.strip().split("=", 1)
+            result[key] = value
+        return result
+
+    def _principal(self):
+        token = self._cookies().get(SESSION_COOKIE, "")
+        return self.auth.parse_session(token) if token else None
+
+    def _auth_required(self) -> bool:
+        return bool(self.server.auth_required)  # type: ignore[attr-defined]
+
+    def _require_auth(self) -> bool:
+        if not self._auth_required():
+            return True
+        if self._principal() is not None:
+            return True
+        self._send_json({"error": "authentication_required"}, status=HTTPStatus.UNAUTHORIZED)
+        return False
+
+    def _set_cookie(self, name: str, value: str, *, max_age: int, secure: bool = True) -> None:
+        parts = [
+            f"{name}={value}",
+            "Path=/",
+            f"Max-Age={max_age}",
+            "HttpOnly",
+            "SameSite=Lax",
+        ]
+        if secure:
+            parts.append("Secure")
+        self.send_header("Set-Cookie", "; ".join(parts))
+
     def log_message(self, format: str, *args: object) -> None:
         return
 
@@ -746,28 +788,87 @@ class VoiceOpsHandler(BaseHTTPRequestHandler):
                     "guardian_voice_bridge_mode": "token" if self.server.bridge_token else ("loopback_only" if self._loopback_bridge_allowed() else "disabled"),  # type: ignore[attr-defined]
                     "live_system_bridge": self.store.snapshot().get("live_system", {}).get("bridge", {}),
                     "production_writes": False,
+                    "auth": self.auth.public_status(),
                 }
             )
             return
+        if self.path == "/api/auth/session":
+            principal = self._principal()
+            self._send_json({
+                "authenticated": principal is not None,
+                "principal": principal.to_dict() if principal else None,
+                "auth": self.auth.public_status(),
+            })
+            return
+        if self.path == "/api/auth/login":
+            try:
+                location, flow_cookie = self.auth.begin_oauth()
+            except ValueError as exc:
+                self._send_json({"error": str(exc)}, status=HTTPStatus.SERVICE_UNAVAILABLE)
+                return
+            self.send_response(HTTPStatus.FOUND)
+            self._set_cookie(OAUTH_FLOW_COOKIE, flow_cookie, max_age=600)
+            self.send_header("Location", location)
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            return
+        if self.path.startswith("/auth/callback"):
+            parsed = urlparse(self.path)
+            query = parse_qs(parsed.query)
+            code = str((query.get("code") or [""])[0])
+            state = str((query.get("state") or [""])[0])
+            flow_token = self._cookies().get(OAUTH_FLOW_COOKIE, "")
+            try:
+                principal = self.auth.complete_oauth(code=code, state=state, flow_token=flow_token)
+                session = self.auth.issue_session(principal)
+            except (ValueError, OSError, TimeoutError, json.JSONDecodeError):
+                self._send_json({"error": "oauth_login_failed"}, status=HTTPStatus.UNAUTHORIZED)
+                return
+            self.send_response(HTTPStatus.FOUND)
+            self._set_cookie(SESSION_COOKIE, session, max_age=self.auth.session_ttl_seconds)
+            self._set_cookie(OAUTH_FLOW_COOKIE, "", max_age=0)
+            self.send_header("Location", "/console")
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            return
+        if self.path == "/console" and not self._require_auth():
+            return
         if self.path == "/api/state":
+            if not self._require_auth():
+                return
             state = self.store.snapshot()
+            principal = self._principal()
+            state["auth"] = {
+                "authenticated": principal is not None,
+                "principal": principal.to_dict() if principal else None,
+            }
             state["assemblyai_voice_agent_enabled"] = bool(self.server.live_voice_enabled)  # type: ignore[attr-defined]
             state["deployment"] = self.server.deployment  # type: ignore[attr-defined]
             self._send_json(state)
             return
         if self.path == "/api/evidence":
+            if not self._require_auth():
+                return
             self._send_json(self.store.evidence())
             return
         if self.path == "/api/replay":
+            if not self._require_auth():
+                return
             self._send_json(self.store.replay())
             return
         if self.path == "/api/assemblyai/token":
+            if not self._require_auth():
+                return
             self._handle_voice_agent_token()
             return
         static_map = {
-            "/": ("index.html", "text/html; charset=utf-8"),
+            "/": ("welcome.html", "text/html; charset=utf-8"),
+            "/console": ("index.html", "text/html; charset=utf-8"),
             "/app.js": ("app.js", "application/javascript; charset=utf-8"),
             "/styles.css": ("styles.css", "text/css; charset=utf-8"),
+            "/welcome.js": ("welcome.js", "application/javascript; charset=utf-8"),
+            "/welcome.css": ("welcome.css", "text/css; charset=utf-8"),
+            "/console_enhance.js": ("console_enhance.js", "application/javascript; charset=utf-8"),
         }
         item = static_map.get(self.path)
         if item is None:
@@ -788,6 +889,41 @@ class VoiceOpsHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:  # noqa: N802
         try:
+            if self.path == "/api/auth/judge-login":
+                payload = self._read_json()
+                principal = self.auth.authenticate_judge(
+                    str(payload.get("username") or ""),
+                    str(payload.get("password") or ""),
+                )
+                if principal is None:
+                    self._send_json({"error": "invalid_credentials"}, status=HTTPStatus.UNAUTHORIZED)
+                    return
+                session = self.auth.issue_session(principal)
+                data = json.dumps(
+                    {"authenticated": True, "principal": principal.to_dict()},
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                ).encode("utf-8")
+                self.send_response(HTTPStatus.OK)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.send_header("Content-Length", str(len(data)))
+                self.send_header("Cache-Control", "no-store")
+                self._set_cookie(SESSION_COOKIE, session, max_age=self.auth.session_ttl_seconds)
+                self.end_headers()
+                self.wfile.write(data)
+                return
+            if self.path == "/api/auth/logout":
+                data = b'{"ok":true}'
+                self.send_response(HTTPStatus.OK)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.send_header("Content-Length", str(len(data)))
+                self.send_header("Cache-Control", "no-store")
+                self._set_cookie(SESSION_COOKIE, "", max_age=0)
+                self.end_headers()
+                self.wfile.write(data)
+                return
+            if not self._require_auth():
+                return
             if self.path == "/api/reset":
                 state = self.store.reset()
                 state["assemblyai_voice_agent_enabled"] = bool(self.server.live_voice_enabled)  # type: ignore[attr-defined]
@@ -926,12 +1062,16 @@ class VoiceOpsDemoServer(ThreadingHTTPServer):
         live_voice_enabled: bool = False,
         bridge_token: str = "",
         deployment: dict[str, Any] | None = None,
+        auth_required: bool = False,
+        auth: VoiceOpsAuth | None = None,
     ) -> None:
         super().__init__(server_address, VoiceOpsHandler)
         self.store = DemoSessionStore(gateway_factory=gateway_factory)
         self.live_voice_enabled = live_voice_enabled
         self.bridge_token = bridge_token
         self.deployment = deployment or _deployment_profile("synthetic")
+        self.auth_required = auth_required
+        self.auth = auth or VoiceOpsAuth()
         self.last_token_issued_at = 0.0
 
 
@@ -962,6 +1102,8 @@ def main() -> None:
         live_voice_enabled=args.enable_live_assemblyai,
         bridge_token=os.getenv("VOICEOPS_BRIDGE_TOKEN", ""),
         deployment=_deployment_profile(args.reasoner),
+        auth_required=_env_truthy("VOICEOPS_AUTH_REQUIRED"),
+        auth=VoiceOpsAuth(),
     )
     print(
         f"InnerOS VoiceOps demo: http://{args.host}:{args.port} · reasoner={args.reasoner} "
