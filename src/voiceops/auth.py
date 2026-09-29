@@ -9,9 +9,8 @@ import secrets
 import time
 from dataclasses import dataclass
 from typing import Any
-from urllib.error import HTTPError
-from urllib.parse import parse_qs, urlencode, urlparse
-from urllib.request import HTTPRedirectHandler, Request, build_opener, urlopen
+from urllib.parse import urlencode
+from urllib.request import Request, urlopen
 
 
 SESSION_COOKIE = "voiceops_session"
@@ -74,7 +73,6 @@ class VoiceOpsAuth:
         issuer: str | None = None,
         client_id: str | None = None,
         redirect_uri: str | None = None,
-        internal_base: str | None = None,
         session_secret: str | None = None,
         judge_user: str | None = None,
         judge_password_hash: str | None = None,
@@ -83,13 +81,7 @@ class VoiceOpsAuth:
         self.issuer = (issuer or os.getenv("VOICEOPS_OAUTH_ISSUER") or DEFAULT_ISSUER).rstrip("/")
         self.client_id = (client_id or os.getenv("VOICEOPS_OAUTH_CLIENT_ID") or "").strip()
         self.redirect_uri = (redirect_uri or os.getenv("VOICEOPS_OAUTH_REDIRECT_URI") or "").strip()
-        self.internal_base = (
-            internal_base
-            or os.getenv("VOICEOPS_OAUTH_INTERNAL_BASE")
-            or "http://127.0.0.1:8103"
-        ).rstrip("/")
-        secret_value = session_secret or os.getenv("VOICEOPS_SESSION_SECRET") or secrets.token_urlsafe(48)
-        self.session_secret = secret_value.encode("utf-8")
+        self.session_secret = (session_secret or os.getenv("VOICEOPS_SESSION_SECRET") or "").encode("utf-8")
         self.judge_user = (judge_user or os.getenv("VOICEOPS_JUDGE_USER") or "").strip()
         self.judge_password_hash = (
             judge_password_hash or os.getenv("VOICEOPS_JUDGE_PASSWORD_HASH") or ""
@@ -103,10 +95,7 @@ class VoiceOpsAuth:
         return bool(self.configured() and self.client_id and self.redirect_uri)
 
     def judge_configured(self) -> bool:
-        return bool(
-            self.oauth_configured()
-            or (self.configured() and self.judge_user and self.judge_password_hash)
-        )
+        return bool(self.configured() and self.judge_user and self.judge_password_hash)
 
     def _sign(self, payload: dict[str, Any]) -> str:
         if not self.session_secret:
@@ -174,100 +163,6 @@ class VoiceOpsAuth:
             auth_source="judge_credentials",
         )
 
-    def authenticate_central_judge(self, username: str, password: str) -> AuthPrincipal | None:
-        """Authenticate a judge against the central InnerOS OAuth user store.
-
-        The browser credential is forwarded only server-to-server to the local
-        OAuth authorization endpoint. VoiceOps never stores the plaintext
-        password. Only central viewer/judge roles are accepted here.
-        """
-        if not self.oauth_configured() or not username.strip() or not password:
-            return None
-
-        state = secrets.token_urlsafe(24)
-        verifier = secrets.token_urlsafe(48)
-        challenge = _b64e(hashlib.sha256(verifier.encode("ascii")).digest())
-        form = urlencode({
-            "response_type": "code",
-            "client_id": self.client_id,
-            "redirect_uri": self.redirect_uri,
-            "state": state,
-            "scope": "openid profile email ralfia:read",
-            "code_challenge": challenge,
-            "code_challenge_method": "S256",
-            "resource": "",
-            "username": username.strip(),
-            "password": password,
-        }).encode("utf-8")
-
-        class _NoRedirect(HTTPRedirectHandler):
-            def redirect_request(self, req, fp, code, msg, headers, newurl):
-                return None
-
-        opener = build_opener(_NoRedirect())
-        request = Request(
-            f"{self.internal_base}/authorize",
-            data=form,
-            headers={"Content-Type": "application/x-www-form-urlencoded", "Host": "auth.pcdoctor.ai"},
-            method="POST",
-        )
-        try:
-            opener.open(request, timeout=10)
-            return None
-        except HTTPError as exc:
-            if exc.code not in {302, 303, 307, 308}:
-                return None
-            location = str(exc.headers.get("Location") or "")
-        parsed = urlparse(location)
-        query = parse_qs(parsed.query)
-        code = str((query.get("code") or [""])[0])
-        returned_state = str((query.get("state") or [""])[0])
-        if not code or not hmac.compare_digest(returned_state, state):
-            return None
-
-        token_data = urlencode({
-            "grant_type": "authorization_code",
-            "code": code,
-            "client_id": self.client_id,
-            "redirect_uri": self.redirect_uri,
-            "code_verifier": verifier,
-        }).encode("utf-8")
-        token_request = Request(
-            f"{self.internal_base}/token",
-            data=token_data,
-            headers={"Content-Type": "application/x-www-form-urlencoded", "Host": "auth.pcdoctor.ai"},
-            method="POST",
-        )
-        try:
-            with urlopen(token_request, timeout=10) as response:
-                token_payload = json.loads(response.read().decode("utf-8"))
-        except (OSError, ValueError, json.JSONDecodeError):
-            return None
-        access_token = str(token_payload.get("access_token") or "")
-        if not access_token:
-            return None
-
-        user_request = Request(
-            f"{self.internal_base}/userinfo",
-            headers={"Authorization": f"Bearer {access_token}", "Host": "auth.pcdoctor.ai"},
-            method="GET",
-        )
-        try:
-            with urlopen(user_request, timeout=10) as response:
-                profile = json.loads(response.read().decode("utf-8"))
-        except (OSError, ValueError, json.JSONDecodeError):
-            return None
-
-        raw_role = str(profile.get("role") or "").lower()
-        if raw_role not in {"viewer", "judge"}:
-            return None
-        return AuthPrincipal(
-            subject=str(profile.get("sub") or f"user_{username.strip()}"),
-            role="judge",
-            display_name=str(profile.get("name") or username.strip()),
-            auth_source="inneros_oauth_judge",
-        )
-
     def begin_oauth(self) -> tuple[str, str]:
         if not self.oauth_configured():
             raise ValueError("central OAuth is not configured for VoiceOps")
@@ -328,13 +223,8 @@ class VoiceOpsAuth:
         subject = str(profile.get("sub") or profile.get("email") or "")
         if not subject:
             raise ValueError("OAuth userinfo did not return a subject")
-        raw_role = str(profile.get("role") or profile.get("voiceops_role") or "viewer").lower()
-        if raw_role in {"owner", "admin"}:
-            role = raw_role
-        elif raw_role in {"viewer", "judge"}:
-            role = "judge"
-        else:
-            role = "judge"
+        raw_role = str(profile.get("role") or profile.get("voiceops_role") or "admin").lower()
+        role = raw_role if raw_role in {"owner", "admin", "judge"} else "admin"
         return AuthPrincipal(
             subject=subject,
             role=role,

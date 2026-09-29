@@ -891,11 +891,10 @@ class VoiceOpsHandler(BaseHTTPRequestHandler):
         try:
             if self.path == "/api/auth/judge-login":
                 payload = self._read_json()
-                username = str(payload.get("username") or "")
-                password = str(payload.get("password") or "")
-                principal = self.auth.authenticate_judge(username, password)
-                if principal is None:
-                    principal = self.auth.authenticate_central_judge(username, password)
+                principal = self.auth.authenticate_judge(
+                    str(payload.get("username") or ""),
+                    str(payload.get("password") or ""),
+                )
                 if principal is None:
                     self._send_json({"error": "invalid_credentials"}, status=HTTPStatus.UNAUTHORIZED)
                     return
