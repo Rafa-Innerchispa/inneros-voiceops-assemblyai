@@ -3,105 +3,119 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#05070b">
+  <meta name="theme-color" content="#030711">
+  <meta name="description" content="InnerOS VoiceOps · governed voice operations for real systems.">
   <title>InnerOS VoiceOps</title>
   <link rel="stylesheet" href="/welcome.css">
 </head>
 <body>
-  <main class="shell">
-    <section class="hero">
-      <div class="brand-row">
-        <div class="mark" aria-hidden="true">
-          <span class="orbit orbit-a"></span>
-          <span class="orbit orbit-b"></span>
-          <span class="core"></span>
-        </div>
-        <div>
-          <p class="eyebrow">INNEROS</p>
-          <h1>VoiceOps</h1>
-        </div>
-        <button class="lang" id="langToggle" type="button">ES</button>
+  <div class="page-grid" aria-hidden="true"></div>
+
+  <header class="topbar">
+    <a class="brand" href="/">
+      <span class="brand-ring" aria-hidden="true"></span>
+      <strong>InnerOS</strong><span>VoiceOps</span>
+    </a>
+    <nav class="nav" aria-label="Primary">
+      <a class="active" href="#overview">Overview</a>
+      <a href="#capabilities">Capabilities</a>
+      <a href="#security">Security</a>
+      <a href="/console">Console</a>
+    </nav>
+    <div class="top-actions">
+      <button class="lang" id="langToggle" type="button">ES</button>
+      <a class="signin" href="/api/auth/login" data-i18n="signIn">Sign In</a>
+    </div>
+  </header>
+
+  <main id="overview" class="hero-shell">
+    <section class="hero-copy">
+      <div class="kicker" data-i18n="kicker">REAL SYSTEMS · VERIFIED ACTIONS.</div><div class="security-kicker">LIVE READS · APPROVAL-GATED ACTIONS</div>
+      <h1 data-i18n-html="headline">Governed Voice<br>Operations for<br><span>Real Systems</span></h1>
+      <p class="lede" data-i18n="subhead">Live intelligence. Explicit approval. Verified actions.</p>
+      <p class="summary" data-i18n="summary">InnerOS VoiceOps connects natural language to real-world operations safely, securely, and under your control.</p>
+
+      <div class="cta-row">
+        <a class="primary oauth" id="oauthButton" href="/api/auth/login">
+          <span class="cta-icon">●</span>
+          <span data-i18n="oauthButton">Continue with InnerOS OAuth</span>
+          <span>›</span>
+        </a>
+        <button class="secondary" id="judgeToggle" type="button">
+          <span class="shield">◇</span><span data-i18n="judgeAccess">Judge Access</span><span>›</span>
+        </button>
       </div>
 
-      <div class="voice-field" aria-hidden="true">
-        <span></span><span></span><span></span><span></span><span></span>
-        <span></span><span></span><span></span><span></span><span></span>
+      <div id="security" class="security-line">
+        <span>▣</span>
+        <span data-i18n="securityLine">Enterprise-grade security. Your data stays under your control.</span>
       </div>
 
-      <p class="headline" data-i18n="headline">Governed voice operations for real systems.</p>
-      <p class="subhead" data-i18n="subhead">
-        Live intelligence from InnerOS. Explicit approval before action. Verification after execution.
-      </p>
-
-      <div class="pill-row">
-        <span data-i18n="pillLive">LIVE READS · APPROVAL-GATED ACTIONS</span>
-        <span data-i18n="pillPermit">EXPLICIT PERMIT</span>
-        <span data-i18n="pillVerify">VERIFIED ACTIONS</span>
-      </div>
-
-      <div class="cap-grid">
-        <article>
-          <small>01</small>
-          <strong data-i18n="capReadTitle">Read live state</strong>
-          <p data-i18n="capReadBody">Home Assistant, UniFi, cameras, lights, servers and safe operational context.</p>
-        </article>
-        <article>
-          <small>02</small>
-          <strong data-i18n="capActTitle">Three authorized actions</strong>
-          <p data-i18n="capActBody">Lights, supported camera restart, and exact-target network restart.</p>
-        </article>
-        <article>
-          <small>03</small>
-          <strong data-i18n="capGovTitle">Governed execution</strong>
-          <p data-i18n="capGovBody">Read → Diagnose → Propose → Approve → Execute → Verify.</p>
-        </article>
-      </div>
+      <section id="judgePanel" class="judge-panel hidden" aria-label="Judge login">
+        <div class="status-line"><span class="status-dot"></span><span id="systemStatus" data-i18n="checking">Checking secure gateway…</span></div>
+        <form id="judgeForm">
+          <label><span data-i18n="username">Username</span><input id="username" name="username" autocomplete="username" required></label>
+          <label><span data-i18n="password">Password</span><input id="password" name="password" type="password" autocomplete="current-password" required></label>
+          <button class="judge-submit" type="submit" data-i18n="enterJudge">Enter demo console</button>
+        </form>
+        <p class="error" id="errorMessage" role="alert"></p>
+      </section>
     </section>
 
-    <section class="auth-card">
-      <div class="status-line">
-        <span class="status-dot"></span>
-        <span id="systemStatus" data-i18n="checking">Checking secure gateway…</span>
+    <section class="visual-stage" aria-label="VoiceOps AI operations visualization">
+      <div class="stage-glow"></div>
+      <div class="orbital orbital-a"></div>
+      <div class="orbital orbital-b"></div>
+      <div class="orbital orbital-c"></div>
+
+      <div class="globe" aria-hidden="true">
+        <span class="globe-ring r1"></span><span class="globe-ring r2"></span>
+        <span class="globe-line g1"></span><span class="globe-line g2"></span>
+        <i class="node n1"></i><i class="node n2"></i><i class="node n3"></i><i class="node n4"></i>
       </div>
 
-      <h2 data-i18n="welcome">Welcome to VoiceOps</h2>
-      <p class="auth-copy" data-i18n="authCopy">
-        Authenticate before entering the operational console.
-      </p>
-
-      <a class="primary oauth" id="oauthButton" href="/api/auth/login">
-        <span data-i18n="oauthButton">Continue with InnerOS OAuth</span>
-        <span>↗</span>
-      </a>
-
-      <div class="divider"><span data-i18n="judgeAccess">JUDGE ACCESS</span></div>
-
-      <form id="judgeForm">
-        <label>
-          <span data-i18n="username">Username</span>
-          <input id="username" name="username" autocomplete="username" required>
-        </label>
-        <label>
-          <span data-i18n="password">Password</span>
-          <input id="password" name="password" type="password" autocomplete="current-password" required>
-        </label>
-        <button class="secondary" type="submit" data-i18n="enterJudge">Enter demo console</button>
-      </form>
-
-      <p class="error" id="errorMessage" role="alert"></p>
-
-      <div class="security-note">
-        <span class="shield">◇</span>
-        <p data-i18n="security">
-          Judge sessions are restricted. No generic admin tools are exposed, and every consequential action still requires an explicit single-use permit.
-        </p>
+      <div class="assistant-slot" aria-hidden="true">
+        <div class="assistant-halo"></div>
+        <div class="assistant-head"><span class="assistant-eye"></span><span class="assistant-ear"></span></div>
+        <div class="assistant-neck"></div>
+        <div class="assistant-body"><span class="assistant-core"></span></div>
       </div>
+
+      <aside class="live-card">
+        <div class="live-card-head"><span>GLOBAL OPERATIONS</span><b>● LIVE</b></div>
+        <div><span data-i18n="systemsOnline">System State</span><strong id="systemLiveState">CHECK</strong></div>
+        <div><span data-i18n="authorizedActions">Authorized Actions</span><strong>3</strong></div>
+        <div><span data-i18n="runtime">Voice Runtime</span><strong id="voiceRuntime">ASSEMBLYAI</strong></div>
+      </aside>
+      <div class="visual-caption" data-i18n="visualCaption">INTELLIGENCE IN SERVICE OF AN OPERATIONAL WORLD.</div>
     </section>
   </main>
 
+  <section id="capabilities" class="capabilities">
+    <article>
+      <div class="cap-head"><span class="cap-icon">◉</span><span class="authorized" data-i18n="authorized">AUTHORIZED</span></div>
+      <h2 data-i18n="lightsTitle">Lights</h2>
+      <p data-i18n="lightsBody">Control connected lighting with explicit approval and verification.</p>
+      <span class="cap-action">⌁ <span data-i18n="voiceControl">Voice Control</span> ›</span>
+    </article>
+    <article>
+      <div class="cap-head"><span class="cap-icon">▣</span><span class="authorized conditional" data-i18n="safeAdapter">SAFE ADAPTER</span></div>
+      <h2 data-i18n="cameraTitle">Camera Restart</h2>
+      <p data-i18n="cameraBody">Restart supported cameras only when a verified safe adapter exists.</p>
+      <span class="cap-action">⌁ <span data-i18n="voiceControl">Voice Control</span> ›</span>
+    </article>
+    <article>
+      <div class="cap-head"><span class="cap-icon">△</span><span class="authorized" data-i18n="authorized">AUTHORIZED</span></div>
+      <h2 data-i18n="networkTitle">Network Restart</h2>
+      <p data-i18n="networkBody">Restart one exact allowlisted UniFi device after explicit approval.</p>
+      <span class="cap-action">⌁ <span data-i18n="voiceControl">Voice Control</span> ›</span>
+    </article>
+  </section>
+
   <footer>
-    <span>InnerOS VoiceOps</span>
-    <span data-i18n="footer">Sovereign local runtime · Central authentication</span>
+    <div><span class="foot-orb"></span> InnerOS VoiceOps <b>v1</b></div>
+    <div>Secure · Audited · Governed</div>
+    <div data-i18n="footer">From conversation to real-world impact.</div>
   </footer>
 
   <script src="/welcome.js"></script>

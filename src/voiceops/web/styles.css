@@ -133,3 +133,24 @@ dialog{width:min(900px,calc(100% - 32px));max-height:84vh;background:#08111e;col
 .action-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}.action-full{width:100%}
 .action-preview{margin-top:12px;border-top:1px solid rgba(255,255,255,.08);padding-top:13px;color:#9aa8bd;font-size:.78rem}
 @media(max-width:900px){.authorized-grid{grid-template-columns:1fr}.authorized-head{flex-direction:column}.live-intel{text-align:left}}
+
+
+/* Premium provenance layer derived from the approved VoiceOps mockup. */
+.provenance-panel{
+  margin-top:16px;border:1px solid rgba(126,182,255,.14);border-radius:16px;
+  background:linear-gradient(180deg,rgba(10,18,31,.74),rgba(6,11,19,.82));
+  padding:14px;box-shadow:inset 0 1px 0 rgba(255,255,255,.018);
+}
+.provenance-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:11px}
+.provenance-head small{display:block;font:700 .46rem/1 var(--mono);letter-spacing:.14em;color:#58718b}
+.provenance-head strong{display:block;margin-top:5px;font-size:.67rem;color:#b8c9db}
+.provenance-badge{border:1px solid rgba(85,230,173,.32);border-radius:999px;padding:6px 9px;font:800 .48rem/1 var(--mono);letter-spacing:.06em;color:var(--success);background:rgba(85,230,173,.05)}
+.provenance-badge.warning{border-color:rgba(255,211,111,.45);color:var(--warning);background:rgba(255,211,111,.07);box-shadow:0 0 24px rgba(255,211,111,.07)}
+.provenance-badge.blocked{border-color:rgba(255,111,143,.45);color:var(--danger);background:rgba(255,111,143,.07)}
+.provenance-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+.provenance-item{min-width:0;border:1px solid rgba(126,182,255,.09);border-radius:11px;padding:9px 10px;background:rgba(255,255,255,.017)}
+.provenance-item>span{display:block;font:700 .44rem/1 var(--mono);letter-spacing:.1em;color:#577089}
+.provenance-item>strong{display:block;margin-top:5px;font-size:.62rem;color:#d2deeb;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.provenance-item>small{display:block;margin-top:4px;color:#677e95;font-size:.52rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.provenance-item b{color:#9ec8ea;font-weight:700}
+@media(max-width:760px){.provenance-grid{grid-template-columns:1fr}.provenance-head{align-items:flex-start;flex-direction:column}}
