@@ -869,6 +869,7 @@ class VoiceOpsHandler(BaseHTTPRequestHandler):
             "/welcome.js": ("welcome.js", "application/javascript; charset=utf-8"),
             "/welcome.css": ("welcome.css", "text/css; charset=utf-8"),
             "/console_enhance.js": ("console_enhance.js", "application/javascript; charset=utf-8"),
+            "/assets/voiceops.png": ("assets/voiceops.png", "image/png"),
         }
         item = static_map.get(self.path)
         if item is None:
