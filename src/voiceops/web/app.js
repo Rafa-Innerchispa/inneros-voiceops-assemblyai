@@ -18,7 +18,10 @@ const els = {
   memoryAfterTruth: $("memoryAfterTruth"), memoryAfterProvider: $("memoryAfterProvider"), memoryAfterCount: $("memoryAfterCount"), memoryAfterSummary: $("memoryAfterSummary"),
   flowVoice: $("flowVoice"), flowMemory: $("flowMemory"), flowReason: $("flowReason"), flowApprove: $("flowApprove"), flowAct: $("flowAct"), flowVerify: $("flowVerify"), flowShare: $("flowShare"),
   deploymentBadge: $("deploymentBadge"), cloudPlaneCard: $("cloudPlaneCard"), localPlaneCard: $("localPlaneCard"),
-  runtimeModeLabel: $("runtimeModeLabel"), runtimeCompute: $("runtimeCompute"), runtimeInference: $("runtimeInference"), runtimeBoundary: $("runtimeBoundary")
+  runtimeModeLabel: $("runtimeModeLabel"), runtimeCompute: $("runtimeCompute"), runtimeInference: $("runtimeInference"), runtimeBoundary: $("runtimeBoundary"),
+  provVoiceProvider: $("provVoiceProvider"), provVoiceWs: $("provVoiceWs"), provSession: $("provSession"),
+  provEvents: $("provEvents"), provFrames: $("provFrames"), provReason: $("provReason"), provReasonDetail: $("provReasonDetail"),
+  provFallbackBadge: $("provFallbackBadge"), provAction: $("provAction"), provActionDetail: $("provActionDetail")
 };
 let currentState = null;
 
@@ -235,6 +238,7 @@ function render(state) {
   currentState = state;
   renderDeployment(state.deployment);
   renderConnections(state);
+  renderProvenance(state);
   els.sessionId.textContent = state.session_id; els.correlationId.textContent = state.correlation_id;
   if (!voiceAgent.liveTranscriptActive) els.transcript.textContent = state.transcript || "No transcript yet.";
   if (state.transcript && !voiceAgent.liveTranscriptActive) setState(els.voiceState, "FINAL TRANSCRIPT", "ready");
@@ -265,12 +269,17 @@ async function postTranscript(path, transcript) {
   catch (err) { els.demoStatus.textContent = `Error: ${err.message}`; }
 }
 
-els.runBtn.addEventListener("click", () => postTranscript("/api/intent", "Ralphi, revisa la incidencia del acceso norte y abre una orden tecnica si corresponde."));
+els.runBtn.addEventListener("click", () => {
+  voiceAgent.fallbackActivations += 1;
+  renderProvenance(currentState || {});
+  postTranscript("/api/intent", "Ralphi, revisa la incidencia del acceso norte y abre una orden tecnica si corresponde.");
+});
 els.approveBtn.addEventListener("click", async () => {
   try {
     const result = await api("/api/tool/approve-pending", {method: "POST", body: JSON.stringify({authorization_phrase: "Sí, autorizo. Yes, authorize."})});
     await refresh();
-    els.agentTranscript.textContent = result.action ? `Authorized · ${result.action.action_id} · ${result.action.status}` : "Authorization processed.";
+    notifyVoiceAgentOfExternalAction(result, "button");
+    els.agentTranscript.textContent = result.action ? `Authorized · ${result.action.action_id} · ${result.action.status} · model context updated` : "Authorization processed.";
   } catch (err) { els.demoStatus.textContent = `Error: ${err.message}`; }
 });
 els.ambiguousBtn.addEventListener("click", () => postTranscript("/api/approve", "Si crees que hace falta."));
@@ -282,7 +291,8 @@ els.closeDialog.addEventListener("click", () => els.dialog.close());
 const voiceAgent = {
   ws: null, mediaStream: null, audioCtx: null, processor: null, source: null, silentGain: null,
   ready: false, sessionId: null, lastFinalUserTranscript: "", pendingToolCalls: [], handledToolCallIds: new Set(), scheduledAudio: [], nextPlaybackTime: 0,
-  liveTranscriptActive: false
+  liveTranscriptActive: false, eventCount: 0, audioFramesSent: 0, detectedLanguage: "auto",
+  fallbackActivations: 0, lastExternalActionResult: null
 };
 
 const systemStatusTool = {
@@ -314,7 +324,7 @@ const approveTool = {
 function voiceAgentConfig() {
   return {type: "session.update", session: {
     system_prompt: [
-      "You are the InnerOS VoiceOps voice interface. Reply in the same language as the user's latest turn. Support natural English and Latin American Spanish, including code-switching.",
+      "You are the InnerOS VoiceOps voice interface. Detect the language of each finalized user turn. If the turn is English, answer only in natural English. If the turn is Spanish, answer only in natural Latin American Spanish. Do not drift between languages unless the user clearly code-switches.",
       "For CURRENT or REAL-TIME state of InnerOS, Home Assistant, cameras, lights, switches, servers, clients, tasks, DMX or alarm status, call query_live_inneros. Never invent a device, incident, or system state.",
       "For remembered or historical verified outcomes, call recall_verified_context.",
       "For a request that CHANGES a connected live system, call propose_live_inneros_action. Never claim the change happened until approve_pending_action returns a completed live result.",
@@ -322,7 +332,7 @@ function voiceAgentConfig() {
       "Do not use the synthetic work-order fallback during normal live voice conversation.",
       "Keep answers short, concrete, and based on tool results."
     ].join(" "),
-    greeting: "VoiceOps ready. Puedes hablarme en español or English.",
+    greeting: "VoiceOps ready.",
     output: {voice: "diego", format: {encoding: "audio/pcm"}},
     input: {
       format: {encoding: "audio/pcm"},
@@ -345,6 +355,64 @@ function phaseUpdate(phase) {
 }
 
 function setLiveStatus(text, kind = "") { els.voiceAgentStatus.textContent = text; els.voiceAgentStatus.className = kind ? `live-status ${kind}` : "live-status"; }
+
+
+function detectTurnLanguage(text = "") {
+  const normalized = String(text).toLowerCase();
+  const spanishSignals = [" el "," la "," los "," las "," que "," por "," para "," quiero "," necesito "," enciende "," apaga "," reinicia "," cámara "," luz "," sí "," autorizo "," casa "];
+  const englishSignals = [" the "," is "," are "," turn "," on "," off "," restart "," camera "," light "," please "," yes "," authorize "," home "," network "];
+  const padded = ` ${normalized} `;
+  const es = spanishSignals.reduce((score, token) => score + (padded.includes(token) ? 1 : 0), 0);
+  const en = englishSignals.reduce((score, token) => score + (padded.includes(token) ? 1 : 0), 0);
+  if (es === en) return voiceAgent.detectedLanguage === "auto" ? "en" : voiceAgent.detectedLanguage;
+  return es > en ? "es" : "en";
+}
+
+function renderProvenance(state = currentState || {}) {
+  if (els.provVoiceProvider) els.provVoiceProvider.textContent = voiceAgent.ready ? "AssemblyAI · LIVE" : (state.assemblyai_voice_agent_enabled ? "AssemblyAI · READY" : "AssemblyAI · OFF");
+  if (els.provVoiceWs) els.provVoiceWs.textContent = voiceAgent.ws ? "wss://agents.assemblyai.com/v1/ws" : "wss://agents.assemblyai.com · not connected";
+  if (els.provSession) els.provSession.textContent = voiceAgent.sessionId || "OFFLINE";
+  if (els.provEvents) els.provEvents.textContent = String(voiceAgent.eventCount);
+  if (els.provFrames) els.provFrames.textContent = String(voiceAgent.audioFramesSent);
+
+  const route = state.route || {};
+  const deployment = state.deployment || {};
+  const provider = route.provider || (deployment.local_inference ? "local-intel-4" : "unknown");
+  const model = route.model || deployment.inference || "Local Qwen";
+  if (els.provReason) els.provReason.textContent = provider.includes("local") ? "InnerOS · Local" : provider;
+  if (els.provReasonDetail) els.provReasonDetail.textContent = model;
+
+  const fallback = Boolean(route.external_fallback ?? route.external_needed ?? false) || voiceAgent.fallbackActivations > 0;
+  if (els.provFallbackBadge) {
+    els.provFallbackBadge.textContent = fallback ? "FALLBACK · ACTIVE" : "FALLBACK · NONE";
+    els.provFallbackBadge.className = `provenance-badge ${fallback ? "warning" : "safe"}`;
+  }
+
+  const action = state.action || voiceAgent.lastExternalActionResult?.action || null;
+  if (els.provAction) els.provAction.textContent = action ? `${action.action_id || action.tool || "action"} · ${String(action.status || "completed").toUpperCase()}` : "No action yet";
+  if (els.provActionDetail) {
+    if (action) els.provActionDetail.textContent = "explicit permit · executed · verified";
+    else els.provActionDetail.textContent = "approval · execution · verification";
+  }
+}
+
+function notifyVoiceAgentOfExternalAction(result, source = "button") {
+  voiceAgent.lastExternalActionResult = result || {};
+  renderProvenance(currentState || {});
+  const action = result?.action || {};
+  const summary = {
+    source,
+    action_id: action.action_id || null,
+    status: action.status || result?.status || "completed",
+    verification: result?.verification || result?.live_result || null
+  };
+  if (voiceAgent.ws && voiceAgent.ws.readyState === WebSocket.OPEN) {
+    const lang = voiceAgent.detectedLanguage === "es" ? "Spanish" : "English";
+    voiceAgent.ws.send(JSON.stringify({type: "session.update", session: {
+      system_prompt: `A governed action was just executed outside the voice tool-call path via ${source}. Treat this as authoritative verified runtime context for the next turn. Result: ${JSON.stringify(summary)}. Respond in ${lang}. Never claim anything beyond this verified result.`
+    }}));
+  }
+}
 
 function setVoiceCoreState(state, statusText = "") {
   if (!els.liveVoiceBtn) return;
@@ -433,6 +501,8 @@ async function flushToolCalls() {
 
 async function handleVoiceAgentMessage(event) {
   const msg = JSON.parse(event.data);
+  voiceAgent.eventCount += 1;
+  renderProvenance(currentState || {});
   if (msg.type === "session.ready") {
     voiceAgent.ready = true; voiceAgent.sessionId = msg.session_id; setVoiceCoreState("ready", `LIVE · ${msg.session_id}`); setState(els.voiceState, "LISTENING", "ready");
     setOrbit(els.orbitAssembly, true, false);
@@ -446,7 +516,19 @@ async function handleVoiceAgentMessage(event) {
     setState(els.voiceState, "TURN DETECTED", "warning");
   }
   else if (msg.type === "transcript.user.delta") { voiceAgent.liveTranscriptActive = true; els.transcript.textContent = msg.text || ""; setState(els.voiceState, "TRANSCRIBING", "active"); }
-  else if (msg.type === "transcript.user") { voiceAgent.lastFinalUserTranscript = msg.text || ""; els.transcript.textContent = voiceAgent.lastFinalUserTranscript || "No transcript yet."; setState(els.voiceState, "FINAL TRANSCRIPT", "ready"); setOrbit(els.orbitAssembly, true, true); }
+  else if (msg.type === "transcript.user") {
+    voiceAgent.lastFinalUserTranscript = msg.text || "";
+    voiceAgent.detectedLanguage = detectTurnLanguage(voiceAgent.lastFinalUserTranscript);
+    els.transcript.textContent = voiceAgent.lastFinalUserTranscript || "No transcript yet.";
+    setState(els.voiceState, "FINAL TRANSCRIPT", "ready"); setOrbit(els.orbitAssembly, true, true);
+    if (voiceAgent.ws && voiceAgent.ws.readyState === WebSocket.OPEN) {
+      const langRule = voiceAgent.detectedLanguage === "es"
+        ? "The user's latest finalized turn is Spanish. Reply only in natural Latin American Spanish for this turn."
+        : "The user's latest finalized turn is English. Reply only in natural English for this turn.";
+      voiceAgent.ws.send(JSON.stringify({type: "session.update", session: {system_prompt: langRule}}));
+    }
+    renderProvenance(currentState || {});
+  }
   else if (msg.type === "reply.audio" && msg.data) playVoiceAgentAudio(msg.data);
   else if (msg.type === "transcript.agent") els.agentTranscript.textContent = msg.text || "";
   else if (msg.type === "tool.call") {
@@ -481,6 +563,8 @@ async function startVoiceAgent() {
     voiceAgent.processor.onaudioprocess = (audioEvent) => {
       if (!voiceAgent.ready || !voiceAgent.ws || voiceAgent.ws.readyState !== WebSocket.OPEN) return;
       voiceAgent.ws.send(JSON.stringify({type: "input.audio", audio: pcm16Base64(audioEvent.inputBuffer.getChannelData(0), voiceAgent.audioCtx.sampleRate)}));
+      voiceAgent.audioFramesSent += 1;
+      if (voiceAgent.audioFramesSent % 10 === 0) renderProvenance(currentState || {});
     };
     els.stopVoiceBtn.disabled = false;
   } catch (err) { cleanupVoiceAgent(false); setVoiceCoreState("error", `OFFLINE · ${err.message}`); }
@@ -493,7 +577,8 @@ function cleanupVoiceAgent(closeSocket = true) {
   if (voiceAgent.mediaStream) voiceAgent.mediaStream.getTracks().forEach((track) => track.stop()); if (voiceAgent.audioCtx) voiceAgent.audioCtx.close().catch(() => {});
   if (closeSocket && voiceAgent.ws && voiceAgent.ws.readyState === WebSocket.OPEN) voiceAgent.ws.close();
   voiceAgent.ws = null; voiceAgent.mediaStream = null; voiceAgent.audioCtx = null; voiceAgent.processor = null; voiceAgent.source = null; voiceAgent.silentGain = null;
-  voiceAgent.sessionId = null; voiceAgent.lastFinalUserTranscript = ""; els.liveVoiceBtn.disabled = false; els.stopVoiceBtn.disabled = true;
+  voiceAgent.sessionId = null; voiceAgent.lastFinalUserTranscript = ""; voiceAgent.detectedLanguage = "auto"; els.liveVoiceBtn.disabled = false; els.stopVoiceBtn.disabled = true;
+  renderProvenance(currentState || {});
   setVoiceCoreState("idle", "READY · PRESS THE CORE");
   setState(els.voiceState, "IDLE", "ready");
 }
@@ -550,7 +635,8 @@ els.orbitPermit.addEventListener("click", async () => {
   try {
     const result = await api("/api/tool/approve-pending", {method: "POST", body: JSON.stringify({authorization_phrase: "Sí, autorizo. Yes, authorize."})});
     await refresh();
-    els.agentTranscript.textContent = result.action ? `Autorizado · ${result.action.action_id} · ${result.action.status}` : "Autorización procesada.";
+    notifyVoiceAgentOfExternalAction(result, "permit_button");
+    els.agentTranscript.textContent = result.action ? `Autorizado · ${result.action.action_id} · ${result.action.status} · contexto del modelo actualizado` : "Autorización procesada.";
   } catch (err) { els.agentTranscript.textContent = `Permit error · ${err.message}`; }
 });
 els.orbitProof.addEventListener("click", async () => {

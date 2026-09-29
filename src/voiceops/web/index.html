@@ -50,6 +50,38 @@
           <span id="runtimeInference" class="runtime-pill">—</span>
           <span id="runtimeBoundary" class="runtime-pill">—</span>
         </div>
+
+        <section class="provenance-panel" aria-label="Live execution provenance">
+          <div class="provenance-head">
+            <div>
+              <small>LIVE PROVENANCE</small>
+              <strong>See exactly what is handling this turn.</strong>
+            </div>
+            <span id="provFallbackBadge" class="provenance-badge safe">FALLBACK · NONE</span>
+          </div>
+          <div class="provenance-grid">
+            <div class="provenance-item">
+              <span>VOICE</span>
+              <strong id="provVoiceProvider">AssemblyAI</strong>
+              <small id="provVoiceWs">wss://agents.assemblyai.com</small>
+            </div>
+            <div class="provenance-item">
+              <span>SESSION</span>
+              <strong id="provSession">OFFLINE</strong>
+              <small><b id="provEvents">0</b> events · <b id="provFrames">0</b> audio frames</small>
+            </div>
+            <div class="provenance-item">
+              <span>REASON</span>
+              <strong id="provReason">Local Qwen</strong>
+              <small id="provReasonDetail">Waiting for runtime evidence</small>
+            </div>
+            <div class="provenance-item">
+              <span>LAST ACTION</span>
+              <strong id="provAction">No action yet</strong>
+              <small id="provActionDetail">approval · execution · verification</small>
+            </div>
+          </div>
+        </section>
       </div>
 
       <div class="voice-stage">
