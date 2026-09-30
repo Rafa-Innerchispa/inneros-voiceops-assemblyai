@@ -1,236 +1,281 @@
 # InnerOS VoiceOps — AssemblyAI Voice Agent Hackathon 2026
 
-<!-- INNEROS-NARRATIVE:START -->
-> **InnerOS role:** R&D / Hackathon Validation  
-> **Lifecycle:** Submission repository  
-> **Lineage:** AssemblyAI Voice Agent Hackathon 2026; reusable voice, approval, and evidence capabilities flow into the maintained VoiceOps product.
->
-> VoiceOps makes speech an interface to governed InnerOS execution rather than a standalone chatbot experience.
->
-> **InnerOS principle:** hackathons are validation environments. Reusable capabilities are extracted into maintained products and platform layers rather than treated as disconnected one-off projects.
-<!-- INNEROS-NARRATIVE:END -->
+> **Voice is the interface. Governed execution is the product.**
 
+InnerOS VoiceOps turns natural voice into controlled, verifiable actions across real infrastructure.
 
-> **Speak. Recall. Decide. Approve. Act. Verify. Remember.**
+AssemblyAI provides the realtime voice experience. InnerOS adds live system context, local-first reasoning, operational memory, explicit human approval, bounded execution, verification, and evidence.
 
-InnerOS VoiceOps is a local-first voice control plane for service operations and physical-world workflows. AssemblyAI provides realtime speech understanding; InnerOS provides context, shared operational memory, routing, policy, approval, execution, verification, and evidence. Verified outcomes can be curated into the same Personal Brain/Cognee memory fabric used by other agents.
+This repository is the canonical submission for the **AssemblyAI Voice Agent Hackathon 2026**.
 
-This is the canonical hackathon repository for the **AssemblyAI Voice Agent Hackathon 2026** on lablab.ai.
+---
 
-## Hackathon facts
+## Live demo
 
-- Organizer: lablab.ai + AssemblyAI
-- Format: fully online
-- Build window: **September 1–30, 2026**
-- Prize pool: **USD 10,000** ($5,000 cash + $5,000 AssemblyAI credits)
-- Registration: open throughout the build window
-- Event: https://lablab.ai/ai-hackathons/assemblyai-voice-agent-hackathon
-- Participation/application: **approved**
-- Repository: `Rafa-Innerchispa/inneros-voiceops-assemblyai`
+### Sovereign local demo
+
+**https://voiceops.creatorcore.ai/**
+
+This is the primary judged demo.
+
+It runs the VoiceOps application on local infrastructure and uses a local Qwen reasoner while keeping AssemblyAI as the realtime voice layer.
+
+### Managed cloud showcase
+
+**https://voiceops-cloud.creatorcore.ai/**
+
+The cloud profile demonstrates the same product and governance UX with a safe managed deployment profile.
+
+### Judge access
+
+Use the **Judge Access / Log In** button on the landing page.
+
+- Username: `voiceops-judge`
+- Password: supplied privately in the hackathon submission form
+- Allow microphone access in the browser
+- Start the live VoiceOps session from the central control
+
+No password, API key, token, or private infrastructure credential is committed to this repository.
+
+---
+
+## What to try
+
+A simple live test:
+
+1. Ask: **“What lights are currently on?”**
+2. Ask: **“Turn off the kitchen light.”**
+3. VoiceOps should propose the action and wait for approval.
+4. Say: **“Yes, authorize.”**
+5. VoiceOps issues a single-use permit, executes only the approved action, and verifies the resulting state.
+
+Other useful questions include:
+
+- “What cameras are currently available?”
+- “What is the Intelbras alarm status?”
+- “What is the current UniFi and Wi-Fi status?”
+- “What is the status of the local servers?”
+
+---
 
 ## Product thesis
 
-We are not building another generic voice chatbot.
+Most voice assistants stop at conversation.
 
-**Voice is the interface. Governed execution is the product.**
+VoiceOps is designed to continue safely into the physical world:
 
-### One product, two execution planes
+```text
+VOICE
+  ↓
+RECALL
+  ↓
+REASON
+  ↓
+PROPOSE
+  ↓
+HUMAN APPROVAL
+  ↓
+SINGLE-USE PERMIT
+  ↓
+ACT
+  ↓
+VERIFY
+  ↓
+REMEMBER
+```
 
-The same VoiceOps application is presented in two real deployment profiles:
+The important part is not simply that an AI can call a tool.
 
-- **Managed cloud:** `https://voiceops-cloud.creatorcore.ai/` runs on Google Cloud Run for customers who want managed infrastructure and elastic delivery.
-- **Sovereign local:** `https://voiceops.creatorcore.ai/` is served from local infrastructure and routes reasoning to the local AMD/Qwen runtime.
-- Both surfaces preserve the same approval, evidence, replay and no-production-write governance contract.
-- Each runtime self-identifies in the UI and health response so the demo does not blur cloud and local truth boundaries.
+The important part is that the system knows:
 
-AssemblyAI remains the realtime voice layer for the judged voice path. “Sovereign local” refers to the application/runtime, operational data boundary and local model inference; it does not falsely claim that AssemblyAI itself is an offline speech provider.
+- what the user asked;
+- what live state was observed;
+- what action was proposed;
+- whether a human explicitly approved it;
+- exactly what capability was permitted;
+- whether the action really executed;
+- what state was observed afterward;
+- and what evidence should be preserved.
 
-The demo proves this chain:
+---
+
+## Current live capabilities
+
+### Realtime voice
+
+- AssemblyAI realtime voice session
+- live transcription
+- natural conversational replies
+- browser microphone input
+- tool calling from the voice agent
+- compact asynchronous tool results to avoid blocking conversational turns
+
+### Local-first reasoning
+
+- local Qwen reasoner for the sovereign deployment
+- operational routing remains inside the InnerOS boundary where practical
+- external services are used only where the product explicitly requires them, such as AssemblyAI for realtime voice
+
+### Live system reads
+
+The sovereign demo can read current state from connected InnerOS capabilities, including:
+
+- Home Assistant
+- lights and switches
+- cameras exposed through Home Assistant
+- Intelbras alarm state
+- UniFi / Wi-Fi state
+- local server and infrastructure health
+- verified operational memory
+
+### Governed physical actions
+
+The demo does **not** expose unrestricted Home Assistant service execution.
+
+Only bounded, allowlisted capabilities are eligible for VoiceOps approval and execution.
+
+Currently demonstrated:
+
+- light control
+- selected network restart actions
+
+Camera restart remains fail-closed unless a dedicated safe adapter is available.
+
+A model cannot turn a memory result into authorization, bypass the approval gate, or replace a single-use execution permit.
+
+---
+
+## Real execution path
+
+The sovereign live path is:
 
 ```text
 Human voice
-    |
-    v
-AssemblyAI realtime STT
-    |
-    v
+    │
+    ▼
+AssemblyAI realtime voice
+    │
+    ▼
+VoiceOps browser session
+    │
+    ▼
 InnerOS Voice Gateway
-    |
-    +--> recall prior verified outcome (Personal Brain / Cognee)
-    +--> context / policy / tenant
-    +--> Resource Fabric routing
-    |      |
-    |      +--> local AMD inference preferred
-    |      +--> external fallback only when required
-    |
-    v
-Governed capability / MCP boundary
-    |
-    v
-Explicit approval gate
-    |
-    v
-Action execution
-    |
-    v
-Audit evidence + replay + HTR
-    |
-    v
-Curated verified outcome -> shared operational memory
-    |
-    v
-Cross-agent recall + human-readable completion result
+    │
+    ├── verified context / memory
+    ├── live system reads
+    ├── local Qwen reasoning
+    └── governed capability routing
+            │
+            ▼
+      Action proposal
+            │
+            ▼
+      Explicit human approval
+            │
+            ▼
+      Single-use execution permit
+            │
+            ▼
+      Allowlisted action
+            │
+            ▼
+      Post-action verification
+            │
+            ▼
+      Evidence + operational memory
 ```
 
-## Demo story
+---
 
-Primary demo scenario:
+## Why this matters
 
-> “Ralphi, tenemos una alarma en el acceso norte. Revisa qué ocurre y abre una orden para el técnico si corresponde.”
+The architecture is intended for environments where AI should help operate real systems without being granted unrestricted control.
 
-VoiceOps should:
+Examples include:
 
-1. transcribe the request with AssemblyAI realtime speech;
-2. receive normalized operational context from the appropriate InnerOS domain boundary;
-3. route reasoning local-first;
-4. propose a bounded action;
-5. require explicit verbal approval before the consequential step;
-6. create a **synthetic/demo work order**;
-7. expose routing, decision, approval, action, replay, and HTR evidence;
-8. report completion;
-9. curate the verified outcome into shared operational memory;
-10. prove that a second agent can recall the same correlation-bound outcome.
+- buildings
+- residential towers
+- offices
+- field operations
+- network infrastructure
+- security systems
+- smart-home and automation environments
 
-The public demo must never require customer PII, production credentials, or destructive actions.
+The same pattern can extend to other bounded capabilities as safe adapters are added.
 
-## Verified state — September 25, 2026
+---
 
-| Capability | State | Truth boundary |
-| --- | --- | --- |
-| Voice Gateway session/correlation/turn state | ✅ Implemented | Tested locally |
-| Explicit approval semantics | ✅ Implemented | Ambiguous/negated approval fails closed |
-| Synthetic service workflow | ✅ Implemented | No production work-order writes |
-| Audit evidence | ✅ Implemented | Synthetic/demo-safe evidence |
-| Captured-state replay | ✅ Implemented | Replays captured evidence, not current state |
-| HTR | ✅ Implemented | `MEASURED` vs `ESTIMATED` retained |
-| AssemblyAI v3 realtime adapter | ✅ Implemented | Lifecycle/turn/context behavior tested |
-| PCM16 mono 16 kHz audio contract | ✅ Implemented | WAV validation + microphone source support |
-| Judge-facing one-screen UI | ✅ Implemented | Synthetic mode clearly labeled |
-| Resource Fabric local-first route | ✅ Verified | `local-amd-5` selected |
-| AMD .5 live bounded inference | ✅ Verified separately | Qwen on local vLLM; external fallback false |
-| Automated tests | ✅ **111/111 PASS** | Dual-deployment profiles + final submission constraints, 2026-09-25 |
-| `compileall` | ✅ PASS | `src` + `tests`, 2026-09-25 |
-| `git diff --check` | ✅ PASS | 2026-09-25 |
-| Live AssemblyAI provider session | ✅ Verified | Captured in the private/local live stack; public demo remains intentionally synthetic |
-| Voice-to-governed-action E2E | ✅ Verified | AssemblyAI -> InnerOS -> local AMD/Qwen -> verbal approval -> action -> Evidence/Replay |
-| Managed cloud showcase | ✅ Deployed | `https://voiceops-cloud.creatorcore.ai/` -> Google Cloud Run |
-| Sovereign local showcase | ✅ Deployed | `https://voiceops.creatorcore.ai/` -> local server + AMD/Qwen reasoner |
-| Dual-deployment parity | ✅ Verified | Same canonical source and governance UX; runtime profile is truth-labeled |
-| Maintained VoiceOps product | ✅ Advanced after hackathon branch | `Rafa-Innerchispa/inneros-voiceops` |
-| Governed FieldOps verbal-approval bridge | ✅ Integrated | `Rafa-Innerchispa/inneros-fieldops-agents-for-humans` |
-| Shared operational memory bridge | ✅ Implemented | Personal Brain/Cognee live-local; truth-labeled synthetic fallback for public judging |
-| Cross-agent recall | ✅ Test-covered | Verified outcome can be recalled by correlation ID after writeback |
-| Pitch deck / demo video / final organizer submit | ⏳ Pending | Presentation / organizer packaging only |
+## Truth boundaries
 
-### Important live truth boundary
+VoiceOps deliberately distinguishes between a capability being implemented and a capability being safe to execute.
 
-The project now exposes two judge-facing deployment profiles from the same canonical application:
+### Sovereign local profile
 
-- **Cloud:** Google Cloud Run uses the safe synthetic reasoner, synthetic memory lane and `production_writes=false`.
-- **Sovereign local:** the local server runs the same judge UI and governance flow with `local-amd-5` / Qwen reasoning. The demo action remains bounded and non-production.
-- Live AssemblyAI voice can be enabled only where the server-side credential is configured. Local inference does not imply AssemblyAI runs offline.
+The local judge surface can connect to live Home Assistant and infrastructure state. Selected allowlisted actions can perform real physical changes after explicit approval.
 
-The private/local stack has also captured the complete AssemblyAI -> InnerOS -> AMD .5 -> explicit approval -> governed action -> evidence loop. Neither public surface exposes production telephony or building controls.
+### Managed cloud profile
 
-The maintained VoiceOps product later completed the conversational SIP/RTP runtime and owner-confirmed end-to-end calling. That product-lineage work lives in `Rafa-Innerchispa/inneros-voiceops`; it is referenced here as post-hackathon evolution, not misrepresented as code contained in this submission repository.
+The managed Cloud Run showcase uses safe demo boundaries where private local infrastructure is not reachable.
 
-No API key may be committed, printed, copied into screenshots, or stored in public evidence.
+### Fail closed
 
-## Local-first rule
+If a safe execution adapter is unavailable, VoiceOps does not simulate success.
 
-This project follows the InnerOS local-first policy:
+It returns a protected or unavailable result instead.
 
-- execute directly on local infrastructure whenever practical;
-- prefer local AMD inference when capability and policy allow it;
-- use external models/agents only for unsupported capability or a verified blocker;
-- avoid unnecessary cloud spend;
-- never weaken authorization, approval, tenant isolation, or evidence to make a demo easier.
+---
 
 ## AssemblyAI integration
 
-The hackathon adapter uses AssemblyAI as a first-class realtime speech layer:
+AssemblyAI is the realtime voice layer used by the judged voice experience.
 
-- v3 realtime streaming contract;
-- partial vs final turn handling;
-- explicit connection lifecycle;
-- controlled final-turn routing into VoiceOps;
-- `agent_context` refresh after InnerOS replies;
-- explicit `disconnect(terminate=True)` shutdown;
-- secret-safe preflight behavior;
-- PCM16 mono 16 kHz validation;
-- bounded evidence that excludes the API key.
+The current implementation includes:
 
-See `docs/LIVE_RUNBOOK.md`.
+- realtime voice websocket session
+- temporary browser token issuance
+- microphone PCM streaming
+- transcript events
+- agent replies
+- audio playback
+- tool calling
+- tool-result round trips
+- timeout/error visibility
+- no browser exposure of the permanent provider API key
 
-## InnerOS boundaries
+AssemblyAI provides the conversational realtime interface. InnerOS provides governed access to systems and actions.
 
-VoiceOps does not duplicate the rest of InnerOS.
+---
 
-### Reused / integrated capabilities
+## Repository structure
 
-- Resource Fabric and local-first routing;
-- AMD .5 inference infrastructure;
-- MCP/capability boundaries;
-- service-operations concepts;
-- Audit Fabric contracts;
-- Forensic Replay / evidence bundles;
-- Human Time Returned instrumentation;
-- correlation and routing evidence;
-- approval and tenant-safety concepts.
+```text
+src/voiceops/
+  adapters/                 provider and reasoning adapters
+  web/                      judge-facing UI
+  gateway.py                session and turn orchestration
+  approval.py               explicit approval semantics
+  execution_permit.py       single-use governed permits
+  inneros_system_bridge.py  live InnerOS / Home Assistant capability bridge
+  shared_memory.py          verified memory bridge
+  audit.py                  evidence and replay support
+  webapp.py                 authenticated judge web application
 
-### New hackathon work
+tests/                      automated verification
+docs/                       architecture and operational documentation
+evidence/                   sanitized evidence/checkpoints
+scripts/                    repository utilities
+Dockerfile                  managed deployment image
+```
 
-- AssemblyAI realtime adapter;
-- voice session / turn state;
-- voice approval UX;
-- audio sources and validation;
-- live demo harness;
-- judge-facing web UI;
-- synthetic VoiceOps workflow;
-- hackathon evidence/runbooks.
+---
 
-Existing InnerOS capabilities are described as **reused/integrated**, not falsely claimed as hackathon-built work.
-
-## Cross-repo boundary
-
-Physical Guardian owns perception and normalized physical incidents/action candidates.
-
-VoiceOps owns speech, turn handling, approval semantics, voice-to-capability routing, and presentation of execution evidence.
-
-Service Operations owns the real work-order lifecycle.
-
-Personal Brain owns the curated shared-memory/Cognee surface. VoiceOps can send only a bounded verified outcome over a loopback-only contract; raw transcripts, credentials, customer payloads and private infrastructure details are excluded.
-
-The hackathon demo binds these boundaries through safe/synthetic adapters rather than copying domain logic into this repository.
-
-
-## Shared operational memory
-
-VoiceOps now demonstrates a bounded memory cycle around governed execution:
-
-`Voice -> Recall -> Reason -> Approval -> Action -> Verify -> Remember -> Cross-agent recall`
-
-The public judge surface defaults to a deterministic **SYNTHETIC** memory lane so the demo never pretends that Cloud Run can reach the private Cognee runtime. In the live-local stack, set `VOICEOPS_SHARED_MEMORY_MODE=live` and `PERSONAL_BRAIN_URL=http://127.0.0.1:8230`; VoiceOps then uses Personal Brain's loopback-only verified-outcome endpoints backed by its configured Cognee memory adapter.
-
-Memory is context, never authorization. A remembered outcome cannot satisfy an approval gate, create an execution permit, or mark an action verified.
-
-## Quick start
+## Local development
 
 Requirements:
 
 - Python 3.11+
 
-Install development dependencies:
+Install:
 
 ```bash
 python3 -m pip install -e '.[dev]'
@@ -244,132 +289,85 @@ python3 -m compileall -q src tests
 git diff --check
 ```
 
-Run the deterministic local demo:
-
-```bash
-voiceops-demo
-```
-
-Run the judge-facing web UI:
+Run the judge-facing web application:
 
 ```bash
 voiceops-web
 ```
 
-The offline UI defaults to deterministic/synthetic reasoning and must remain visibly labeled as such.
-
-## Live AssemblyAI run
-
-Install the AssemblyAI integration:
-
-```bash
-python3 -m pip install -e '.[assemblyai]'
-```
-
-Microphone support:
-
-```bash
-python3 -m pip install -e '.[microphone]'
-```
-
-Provide the key through a secure runtime environment, **never through Git**:
+For a live AssemblyAI environment, provide the API key through the runtime environment only:
 
 ```text
 ASSEMBLYAI_API_KEY=<server-side secret>
 ```
 
-Preflight:
+Never commit provider credentials.
 
-```bash
-voiceops-live --preflight
-```
+---
 
-Controlled PCM16 mono 16 kHz WAV:
+## Security model
 
-```bash
-voiceops-live --wav path/to/demo.wav --evidence evidence/live_wav_e2e.json
-```
+VoiceOps follows a simple rule:
 
-Microphone:
+**Memory is context, not authority.**
 
-```bash
-voiceops-live --microphone --evidence evidence/live_microphone_e2e.json
-```
+The system therefore separates:
 
-See `docs/LIVE_RUNBOOK.md` before any live provider run.
+- read access;
+- reasoning;
+- proposals;
+- human approval;
+- execution permits;
+- execution;
+- verification.
 
-## Evidence
+Consequential actions must cross the approval and permit boundaries.
 
-Current evidence includes:
+The public repository must not contain:
 
-- AMD .5 local reasoning proof;
-- Resource Fabric local route proof;
-- live-audio implementation checkpoint;
-- integration-boundary review;
-- judge UI checkpoint;
-- deterministic tests for approval, audit, gateway E2E, AssemblyAI adapter, AMD adapter, audio, web UI, and HTTP flow.
+- API keys
+- passwords
+- session tokens
+- private customer data
+- private recordings
+- unrestricted infrastructure credentials
 
-Evidence is intentionally truth-sensitive. A component being implemented does not automatically mean an external provider session has been executed.
+---
 
-## Repository map
+## Hackathon validation
 
-```text
-src/voiceops/              VoiceOps application
-  adapters/                AssemblyAI + local AMD boundaries
-  web/                     Judge-facing static UI
-  gateway.py               Session/turn orchestration
-  approval.py              Explicit approval semantics
-  audit.py                 Evidence integration
-  audio.py                 WAV/microphone sources
-  live_demo.py             Live AssemblyAI harness
-  webapp.py                Judge demo server
-  workflows.py             Synthetic governed workflow
+The submission has demonstrated:
 
-tests/                     Automated verification
-docs/                      Architecture, runbooks, demo/submission docs
-evidence/                  Sanitized checkpoints and measured evidence
-```
+- live AssemblyAI voice
+- local-first InnerOS reasoning
+- live Home Assistant reads
+- live UniFi reads
+- approval-gated actions
+- real light-control execution
+- single-use execution permits
+- post-action verification
+- evidence-oriented workflow
+- browser-visible tool execution status
+- protected failure behavior when a safe adapter is unavailable
 
-## Security and truth policy
+Recent final fixes merged to `main` include:
 
-- Never commit API keys, tokens, credential-bearing URLs, customer identifiers, or private recordings.
-- Public evidence uses synthetic or explicitly sanitized data.
-- `MEASURED` means backed by captured measurements.
-- `ESTIMATED` stays labeled as an estimate.
-- Replay never silently fetches current state and presents it as historical state.
-- Public demo actions remain synthetic unless a separate production authorization model is introduced outside the hackathon surface.
+- full live Home Assistant / UniFi routing
+- governed live action routing
+- specific UniFi target resolution
+- tool-call stall repair
+- compact asynchronous tool-result handling
 
-## Definition of done
+---
 
-The technical core is submission-ready. Final organizer closure now requires only:
+## Related deployment profiles
 
-- [x] live AssemblyAI / governed-action evidence;
-- [x] exact-current-tree automated verification;
-- [x] bounded committed-secret regression scan;
-- [x] managed Cloud Run and sovereign-local judge surfaces;
-- [x] final submission copy and judge instructions;
-- [ ] cover / architecture media;
-- [ ] fresh judge screenshots;
-- [ ] demo video;
-- [ ] pitch deck/media upload if accepted by the organizer form;
-- [ ] verify team/project attachment on lablab.ai;
-- [ ] final lablab.ai submission.
+- Sovereign local: https://voiceops.creatorcore.ai/
+- Managed cloud: https://voiceops-cloud.creatorcore.ai/
 
-The canonical detailed checklist is `docs/HACKATHON_CHECKLIST.md`.
+The same canonical application is used with different runtime truth boundaries.
 
-## Canonical resume order
-
-When resuming development, read:
-
-1. `README.md`
-2. `docs/PROJECT_CANONICAL.md`
-3. `docs/HACKATHON_CHECKLIST.md`
-4. `docs/LIVE_RUNBOOK.md`
-5. `docs/ARCHITECTURE.md`
-6. `docs/DEMO_SCRIPT.md`
-7. latest files under `evidence/`
-
-Then continue from the first incomplete P0 item instead of redesigning the project from memory.
+---
 
 ## License
 
