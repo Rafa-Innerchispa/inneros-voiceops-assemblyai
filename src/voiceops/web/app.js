@@ -21,7 +21,9 @@ const els = {
   runtimeModeLabel: $("runtimeModeLabel"), runtimeCompute: $("runtimeCompute"), runtimeInference: $("runtimeInference"), runtimeBoundary: $("runtimeBoundary"),
   provVoiceProvider: $("provVoiceProvider"), provVoiceWs: $("provVoiceWs"), provSession: $("provSession"),
   provEvents: $("provEvents"), provFrames: $("provFrames"), provReason: $("provReason"), provReasonDetail: $("provReasonDetail"),
-  provFallbackBadge: $("provFallbackBadge"), provAction: $("provAction"), provActionDetail: $("provActionDetail")
+  provFallbackBadge: $("provFallbackBadge"), provAction: $("provAction"), provActionDetail: $("provActionDetail"),
+  translationDirection: $("translationDirection"), translationUser: $("translationUser"), translationAgent: $("translationAgent"),
+  verifyVoicePath: $("verifyVoicePath"), verifyFallback: $("verifyFallback"), verifyAction: $("verifyAction")
 };
 let currentState = null;
 
@@ -387,9 +389,15 @@ function renderProvenance(state = currentState || {}) {
     els.provFallbackBadge.textContent = fallback ? "FALLBACK · ACTIVE" : "FALLBACK · NONE";
     els.provFallbackBadge.className = `provenance-badge ${fallback ? "warning" : "safe"}`;
   }
+  if (els.verifyFallback) els.verifyFallback.textContent = fallback ? "ACTIVE" : "NONE";
+  if (els.verifyVoicePath) {
+    const wsState = voiceAgent.ws?.readyState === WebSocket.OPEN ? "WS CONNECTED" : (state.assemblyai_voice_agent_enabled ? "READY" : "OFF");
+    els.verifyVoicePath.textContent = `AssemblyAI · ${wsState}`;
+  }
 
   const action = state.action || voiceAgent.lastExternalActionResult?.action || null;
   if (els.provAction) els.provAction.textContent = action ? `${action.action_id || action.tool || "action"} · ${String(action.status || "completed").toUpperCase()}` : "No action yet";
+  if (els.verifyAction) els.verifyAction.textContent = action ? `${action.action_type || action.tool || "action"} · ${String(action.status || "completed").toUpperCase()}` : "No action yet";
   if (els.provActionDetail) {
     if (action) els.provActionDetail.textContent = "explicit permit · executed · verified";
     else els.provActionDetail.textContent = "approval · execution · verification";
@@ -520,6 +528,8 @@ async function handleVoiceAgentMessage(event) {
     voiceAgent.lastFinalUserTranscript = msg.text || "";
     voiceAgent.detectedLanguage = detectTurnLanguage(voiceAgent.lastFinalUserTranscript);
     els.transcript.textContent = voiceAgent.lastFinalUserTranscript || "No transcript yet.";
+    if (els.translationUser) els.translationUser.textContent = voiceAgent.lastFinalUserTranscript || "Waiting for a finalized voice turn…";
+    if (els.translationDirection) els.translationDirection.textContent = voiceAgent.detectedLanguage === "es" ? "ES · LIVE TURN" : "EN · LIVE TURN";
     setState(els.voiceState, "FINAL TRANSCRIPT", "ready"); setOrbit(els.orbitAssembly, true, true);
     if (voiceAgent.ws && voiceAgent.ws.readyState === WebSocket.OPEN) {
       const langRule = voiceAgent.detectedLanguage === "es"
@@ -530,7 +540,7 @@ async function handleVoiceAgentMessage(event) {
     renderProvenance(currentState || {});
   }
   else if (msg.type === "reply.audio" && msg.data) playVoiceAgentAudio(msg.data);
-  else if (msg.type === "transcript.agent") els.agentTranscript.textContent = msg.text || "";
+  else if (msg.type === "transcript.agent") els.agentTranscript.textContent = msg.text || ""; if (els.translationAgent) els.translationAgent.textContent = msg.text || "";
   else if (msg.type === "tool.call") {
     const duplicate = voiceAgent.handledToolCallIds.has(msg.call_id) || voiceAgent.pendingToolCalls.some((call) => call.call_id === msg.call_id);
     if (!duplicate) {
