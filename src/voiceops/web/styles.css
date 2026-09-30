@@ -199,14 +199,6 @@ dialog{width:min(900px,calc(100% - 32px));max-height:84vh;background:#08111e;col
       radial-gradient(circle,rgba(74,213,255,.16),rgba(31,119,255,.06) 38%,transparent 68%);
     box-shadow:0 0 90px rgba(41,151,255,.18);
   }
-  .voice-stage::after{
-    content:"";position:absolute;left:69%;top:47%;width:185px;height:185px;transform:translate(-50%,-50%);
-    pointer-events:none;z-index:1;border-radius:50%;
-    background:
-      radial-gradient(circle at 42% 32%,rgba(145,227,255,.22),rgba(17,112,220,.12) 35%,rgba(3,25,56,.5) 67%,rgba(2,12,28,.82));
-    border:2px solid rgba(88,202,255,.78);
-    box-shadow:inset 0 0 36px rgba(55,186,255,.28),0 0 38px rgba(42,167,255,.28),0 0 95px rgba(32,113,255,.22);
-  }
   .stage-grid{opacity:.25}
   .orbit{top:47%}
   .orbit-1{width:220px;height:220px}

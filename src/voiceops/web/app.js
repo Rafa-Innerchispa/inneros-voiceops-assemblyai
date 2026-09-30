@@ -326,7 +326,7 @@ const approveTool = {
 
 function voiceAgentConfig() {
   const uiLanguage = localStorage.getItem("voiceops_ui_lang") === "es" ? "es" : "en";
-  const voice = uiLanguage === "es" ? "lucia" : "mia";
+  const voice = uiLanguage === "es" ? "lola" : "alba";
   const languageCodes = uiLanguage === "es" ? ["es", "en"] : ["en", "es"];
   voiceAgent.configuredVoice = voice;
   voiceAgent.configuredLanguage = uiLanguage;
