@@ -146,12 +146,16 @@ def _restart_proposal(text: str) -> dict[str, Any] | None:
         for alias, entity in NETWORK_RESTART_TARGETS.items()
         if alias in lowered
     ]
-    unique: dict[str, str] = {}
-    for alias, entity in matches:
-        unique[entity] = alias
-    if len(unique) != 1:
+    if not matches:
         return None
-    entity, alias = next(iter(unique.items()))
+    # Prefer the longest/specific alias. Example: "u7 living" must resolve to
+    # the U7 restart button instead of becoming ambiguous with generic "living".
+    matches.sort(key=lambda item: len(item[0]), reverse=True)
+    best_alias, best_entity = matches[0]
+    same_specificity = {entity for alias, entity in matches if len(alias) == len(best_alias)}
+    if len(same_specificity) != 1:
+        return None
+    alias, entity = best_alias, best_entity
     return {
         "tool": "voiceops_restart_network_device",
         "args": {"target": alias, "entity_id": entity},
@@ -227,6 +231,28 @@ if operation == "query":
         elif re.search(r"\b(switches?|interruptores?|enchufes?)\b", text, re.I):
             calls.insert(1, ("ha_list_entities", {"domain": "switch", "limit": 30}))
 
+    explicit_network = bool(re.search(
+        r"\b(unifi|wi-?fi|wifi|network|red|access point|ap\b|gateway|router|ssid|wlan)\b",
+        text,
+        re.I,
+    ))
+    if explicit_network:
+        # Do not answer current network state from RAG/memory when live UniFi
+        # entities are already present in Home Assistant.
+        calls = [(name, args) for name, args in calls if name != "hybrid_search"]
+        live_unifi_entities = [
+            "binary_sensor.unifi_dream_machine_wan_status",
+            "device_tracker.cloud_gateway_ultra_ralphi",
+            "device_tracker.u7_lite",
+            "switch.rafahome5g_enabled",
+            "switch.rafahome2_4g_enabled",
+            "switch.rafah2_4ghz_enabled",
+            "sensor.u7_lite_state",
+            "sensor.u7_lite_uptime",
+        ]
+        for entity_id in reversed(live_unifi_entities):
+            calls.insert(0, ("ha_get_entity", {"entity_id": entity_id}))
+
     if re.search(r"\b(camera|cameras|camara|cámaras|cam|video|videovigilancia)\b", text, re.I):
         calls.insert(0, ("ha_list_entities", {"domain": "camera", "limit": 30}))
     seen = set()
@@ -235,9 +261,10 @@ if operation == "query":
     write_proposals = []
     protected = []
     for name, args in calls:
-        if name in seen:
+        dedupe_key = json.dumps([name, args], sort_keys=True, ensure_ascii=False, default=str)
+        if dedupe_key in seen:
             continue
-        seen.add(name)
+        seen.add(dedupe_key)
         detected.append({"tool": name, "args": args})
         if name in READ:
             results.append({"tool": name, "args": args, "result": ex.call_tool(user, name, args)})
