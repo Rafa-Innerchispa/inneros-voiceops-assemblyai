@@ -51,37 +51,7 @@
           <span id="runtimeBoundary" class="runtime-pill">—</span>
         </div>
 
-        <section class="provenance-panel" aria-label="Live execution provenance">
-          <div class="provenance-head">
-            <div>
-              <small>LIVE PROVENANCE</small>
-              <strong>See exactly what is handling this turn.</strong>
-            </div>
-            <span id="provFallbackBadge" class="provenance-badge safe">FALLBACK · NONE</span>
-          </div>
-          <div class="provenance-grid">
-            <div class="provenance-item">
-              <span>VOICE</span>
-              <strong id="provVoiceProvider">AssemblyAI</strong>
-              <small id="provVoiceWs">wss://agents.assemblyai.com</small>
-            </div>
-            <div class="provenance-item">
-              <span>SESSION</span>
-              <strong id="provSession">OFFLINE</strong>
-              <small><b id="provEvents">0</b> events · <b id="provFrames">0</b> audio frames</small>
-            </div>
-            <div class="provenance-item">
-              <span>REASON</span>
-              <strong id="provReason">Local Qwen</strong>
-              <small id="provReasonDetail">Waiting for runtime evidence</small>
-            </div>
-            <div class="provenance-item">
-              <span>LAST ACTION</span>
-              <strong id="provAction">No action yet</strong>
-              <small id="provActionDetail">approval · execution · verification</small>
-            </div>
-          </div>
-        </section>
+
       </div>
 
       <div class="voice-stage">
@@ -118,6 +88,25 @@
           <span class="orbit-offset"><span class="orbit-card"><span class="orbit-index">06</span><strong>VERIFY</strong><small>proof + replay</small></span></span>
         </button>
 
+
+
+        <div class="stage-caption">
+          <span class="stage-dot"></span>
+          <div>
+            <strong id="demoStatus">Ready for live voice.</strong>
+            <small>Speech is evidence. Memory is context. Approval is authorization.</small>
+          </div>
+        </div>
+
+      </div>
+
+      <aside class="live-console" aria-label="Live conversation and translation">
+        <div class="console-tabs">
+          <span class="console-tab active">CONVERSATION</span>
+          <span class="console-tab">TRANSLATION</span>
+          <span class="console-tab">PROVENANCE</span>
+        </div>
+
         <div class="live-readout">
           <div class="live-readout-head">
             <span id="voiceAgentStatus" class="live-status">READY · PRESS THE CORE</span>
@@ -127,14 +116,59 @@
           <div id="agentTranscript" class="agent-transcript">InnerOS response will appear here.</div>
         </div>
 
-        <div class="stage-caption">
-          <span class="stage-dot"></span>
-          <div>
-            <strong id="demoStatus">Ready for live voice.</strong>
-            <small>Speech is evidence. Memory is context. Approval is authorization.</small>
+        <section class="translation-panel">
+          <div class="translation-head">
+            <span>TRANSLATION · LIVE</span>
+            <b id="translationDirection">AUTO · EN / ES</b>
           </div>
-        </div>
-      </div>
+          <div class="translation-block">
+            <span>YOU</span>
+            <p id="translationUser">Waiting for a finalized voice turn…</p>
+          </div>
+          <div class="translation-block assistant">
+            <span>INNEROS</span>
+            <p id="translationAgent">The translated/paired response will appear here.</p>
+          </div>
+        </section>
+
+        <section class="provenance-panel" aria-label="Live execution provenance">
+          <div class="provenance-head">
+            <div>
+              <small>LIVE PROVENANCE</small>
+              <strong>See exactly what is handling this turn.</strong>
+            </div>
+            <span id="provFallbackBadge" class="provenance-badge safe">FALLBACK · NONE</span>
+          </div>
+          <div class="provenance-grid">
+            <div class="provenance-item">
+              <span>VOICE</span>
+              <strong id="provVoiceProvider">AssemblyAI</strong>
+              <small id="provVoiceWs">wss://agents.assemblyai.com</small>
+            </div>
+            <div class="provenance-item">
+              <span>SESSION</span>
+              <strong id="provSession">OFFLINE</strong>
+              <small><b id="provEvents">0</b> events · <b id="provFrames">0</b> audio frames</small>
+            </div>
+            <div class="provenance-item">
+              <span>REASON</span>
+              <strong id="provReason">Local Qwen</strong>
+              <small id="provReasonDetail">Waiting for runtime evidence</small>
+            </div>
+            <div class="provenance-item">
+              <span>LAST ACTION</span>
+              <strong id="provAction">No action yet</strong>
+              <small id="provActionDetail">approval · execution · verification</small>
+            </div>
+          </div>
+        </section>
+
+        <section class="quick-verification">
+          <div><span>VOICE PATH</span><strong id="verifyVoicePath">AssemblyAI · waiting</strong></div>
+          <div><span>FALLBACK</span><strong id="verifyFallback">NONE</strong></div>
+          <div><span>ACTION</span><strong id="verifyAction">No action yet</strong></div>
+        </section>
+      </aside>
     </section>
 
     <section class="judge-flow" aria-label="Governed execution flow">
