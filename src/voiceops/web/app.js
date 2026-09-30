@@ -294,7 +294,8 @@ const voiceAgent = {
   ws: null, mediaStream: null, audioCtx: null, processor: null, source: null, silentGain: null,
   ready: false, sessionId: null, lastFinalUserTranscript: "", pendingToolCalls: [], handledToolCallIds: new Set(), scheduledAudio: [], nextPlaybackTime: 0,
   liveTranscriptActive: false, eventCount: 0, audioFramesSent: 0, detectedLanguage: "auto",
-  fallbackActivations: 0, lastExternalActionResult: null
+  fallbackActivations: 0, lastExternalActionResult: null,
+  configuredVoice: null, configuredLanguage: null, turnFinalAt: 0, replyStartedAt: 0, firstAudioAt: 0
 };
 
 const systemStatusTool = {
@@ -324,9 +325,14 @@ const approveTool = {
 };
 
 function voiceAgentConfig() {
+  const uiLanguage = localStorage.getItem("voiceops_ui_lang") === "es" ? "es" : "en";
+  const voice = uiLanguage === "es" ? "lucia" : "mia";
+  const languageCodes = uiLanguage === "es" ? ["es", "en"] : ["en", "es"];
+  voiceAgent.configuredVoice = voice;
+  voiceAgent.configuredLanguage = uiLanguage;
   return {type: "session.update", session: {
     system_prompt: [
-      "You are the InnerOS VoiceOps voice interface. Detect the language of each finalized user turn. If the turn is English, answer only in natural English. If the turn is Spanish, answer only in natural Latin American Spanish. Do not drift between languages unless the user clearly code-switches.",
+      `You are the InnerOS VoiceOps voice interface. The preferred session language is ${uiLanguage === "es" ? "Spanish" : "English"}. Detect the language of each finalized user turn. If the turn is English, answer only in fluent natural English. If the turn is Spanish, answer only in natural Latin American Spanish. Never answer with generic small-talk when the user asks who you are: identify yourself briefly as InnerOS VoiceOps. Do not drift between languages unless the user clearly code-switches.`,
       "For CURRENT or REAL-TIME state of InnerOS, Home Assistant, cameras, lights, switches, servers, clients, tasks, DMX or alarm status, call query_live_inneros. Never invent a device, incident, or system state.",
       "For remembered or historical verified outcomes, call recall_verified_context.",
       "For a request that CHANGES a connected live system, call propose_live_inneros_action. Never claim the change happened until approve_pending_action returns a completed live result.",
@@ -334,12 +340,16 @@ function voiceAgentConfig() {
       "Do not use the synthetic work-order fallback during normal live voice conversation.",
       "Keep answers short, concrete, and based on tool results."
     ].join(" "),
-    greeting: "VoiceOps ready.",
-    output: {voice: "diego", format: {encoding: "audio/pcm"}},
+    greeting: uiLanguage === "es" ? "VoiceOps listo." : "VoiceOps ready.",
+    output: {voice, format: {encoding: "audio/pcm"}, volume: 100},
     input: {
       format: {encoding: "audio/pcm"},
-      keyterms: ["InnerOS", "Ralphi", "Home Assistant", "AssemblyAI", "Cognee", "DMX", "Intelbras", "sí autorizo", "yes authorize"],
-      language_codes: ["en", "es"]
+      keyterms: ["InnerOS", "VoiceOps", "Ralphi", "Home Assistant", "AssemblyAI", "Cognee", "DMX", "Intelbras", "sí autorizo", "yes authorize"],
+      language_codes: ["en", "es"],
+      transcription_mode: "min_latency",
+      transcription_prompt: "InnerOS VoiceOps for smart homes and buildings. Expect Home Assistant, MCP, AssemblyAI, cameras, lights, networks, permits and verification.",
+      voice_focus: "near-field",
+      turn_detection: {interrupt_response: true}
     },
     tools: [systemStatusTool, recallTool, systemActionTool]
   }};
@@ -371,7 +381,10 @@ function detectTurnLanguage(text = "") {
 }
 
 function renderProvenance(state = currentState || {}) {
-  if (els.provVoiceProvider) els.provVoiceProvider.textContent = voiceAgent.ready ? "AssemblyAI · LIVE" : (state.assemblyai_voice_agent_enabled ? "AssemblyAI · READY" : "AssemblyAI · OFF");
+  if (els.provVoiceProvider) {
+    const voiceLabel = voiceAgent.configuredVoice ? ` · ${voiceAgent.configuredVoice}` : "";
+    els.provVoiceProvider.textContent = voiceAgent.ready ? `AssemblyAI · LIVE${voiceLabel}` : (state.assemblyai_voice_agent_enabled ? "AssemblyAI · READY" : "AssemblyAI · OFF");
+  }
   if (els.provVoiceWs) els.provVoiceWs.textContent = voiceAgent.ws ? "wss://agents.assemblyai.com/v1/ws" : "wss://agents.assemblyai.com · not connected";
   if (els.provSession) els.provSession.textContent = voiceAgent.sessionId || "OFFLINE";
   if (els.provEvents) els.provEvents.textContent = String(voiceAgent.eventCount);
@@ -511,48 +524,115 @@ async function handleVoiceAgentMessage(event) {
   const msg = JSON.parse(event.data);
   voiceAgent.eventCount += 1;
   renderProvenance(currentState || {});
+
   if (msg.type === "session.ready") {
-    voiceAgent.ready = true; voiceAgent.sessionId = msg.session_id; setVoiceCoreState("ready", `LIVE · ${msg.session_id}`); setState(els.voiceState, "LISTENING", "ready");
+    voiceAgent.ready = true;
+    voiceAgent.sessionId = msg.session_id;
+    setVoiceCoreState("ready", `LIVE · ${msg.session_id}`);
+    setState(els.voiceState, "LISTENING", "ready");
     setOrbit(els.orbitAssembly, true, false);
-  } else if (msg.type === "input.speech.started") {
+    return;
+  }
+
+  if (msg.type === "input.speech.started") {
     setVoiceCoreState("user-speaking", "YOU ARE SPEAKING · ASSEMBLYAI LISTENING");
     setState(els.voiceState, "LISTENING", "active");
     setOrbit(els.orbitAssembly, true, false);
+    return;
   }
-  else if (msg.type === "input.speech.stopped") {
+
+  if (msg.type === "input.speech.stopped") {
     setVoiceCoreState("ready", "TURN DETECTED · PROCESSING");
     setState(els.voiceState, "TURN DETECTED", "warning");
+    return;
   }
-  else if (msg.type === "transcript.user.delta") { voiceAgent.liveTranscriptActive = true; els.transcript.textContent = msg.text || ""; setState(els.voiceState, "TRANSCRIBING", "active"); }
-  else if (msg.type === "transcript.user") {
+
+  if (msg.type === "transcript.user.delta") {
+    voiceAgent.liveTranscriptActive = true;
+    els.transcript.textContent = msg.text || "";
+    setState(els.voiceState, "TRANSCRIBING", "active");
+    return;
+  }
+
+  if (msg.type === "transcript.user") {
     voiceAgent.lastFinalUserTranscript = msg.text || "";
+    voiceAgent.turnFinalAt = performance.now();
+    voiceAgent.replyStartedAt = 0;
+    voiceAgent.firstAudioAt = 0;
     voiceAgent.detectedLanguage = detectTurnLanguage(voiceAgent.lastFinalUserTranscript);
     els.transcript.textContent = voiceAgent.lastFinalUserTranscript || "No transcript yet.";
     if (els.translationUser) els.translationUser.textContent = voiceAgent.lastFinalUserTranscript || "Waiting for a finalized voice turn…";
     if (els.translationDirection) els.translationDirection.textContent = voiceAgent.detectedLanguage === "es" ? "ES · LIVE TURN" : "EN · LIVE TURN";
-    setState(els.voiceState, "FINAL TRANSCRIPT", "ready"); setOrbit(els.orbitAssembly, true, true);
+    setState(els.voiceState, "FINAL TRANSCRIPT", "ready");
+    setOrbit(els.orbitAssembly, true, true);
+
     if (voiceAgent.ws && voiceAgent.ws.readyState === WebSocket.OPEN) {
       const langRule = voiceAgent.detectedLanguage === "es"
-        ? "The user's latest finalized turn is Spanish. Reply only in natural Latin American Spanish for this turn."
-        : "The user's latest finalized turn is English. Reply only in natural English for this turn.";
+        ? "The user's latest finalized turn is Spanish. Reply only in natural Latin American Spanish for this turn. Keep it short."
+        : "The user's latest finalized turn is English. Reply only in fluent natural English for this turn. Keep it short.";
       voiceAgent.ws.send(JSON.stringify({type: "session.update", session: {system_prompt: langRule}}));
     }
     renderProvenance(currentState || {});
+    return;
   }
-  else if (msg.type === "reply.audio" && msg.data) playVoiceAgentAudio(msg.data);
-  else if (msg.type === "transcript.agent") els.agentTranscript.textContent = msg.text || ""; if (els.translationAgent) els.translationAgent.textContent = msg.text || "";
-  else if (msg.type === "tool.call") {
+
+  if (msg.type === "reply.started") {
+    voiceAgent.replyStartedAt = performance.now();
+    setVoiceCoreState("agent-speaking", "INNEROS THINKING · ASSEMBLYAI LIVE");
+    renderProvenance(currentState || {});
+    return;
+  }
+
+  if (msg.type === "reply.audio" && msg.data) {
+    if (!voiceAgent.firstAudioAt) {
+      voiceAgent.firstAudioAt = performance.now();
+      const firstAudioMs = voiceAgent.turnFinalAt ? Math.round(voiceAgent.firstAudioAt - voiceAgent.turnFinalAt) : null;
+      if (els.provVoiceWs && firstAudioMs !== null) {
+        els.provVoiceWs.textContent = `wss://agents.assemblyai.com/v1/ws · first audio ${firstAudioMs} ms`;
+      }
+    }
+    playVoiceAgentAudio(msg.data);
+    return;
+  }
+
+  if (msg.type === "transcript.agent") {
+    els.agentTranscript.textContent = msg.text || "";
+    if (els.translationAgent) els.translationAgent.textContent = msg.text || "";
+    return;
+  }
+
+  if (msg.type === "tool.call") {
     const duplicate = voiceAgent.handledToolCallIds.has(msg.call_id) || voiceAgent.pendingToolCalls.some((call) => call.call_id === msg.call_id);
     if (!duplicate) {
       voiceAgent.pendingToolCalls.push({call_id: msg.call_id, name: msg.name});
       setLiveStatus(`TOOL REQUEST · ${msg.name}`, "active");
     }
+    return;
   }
-  else if (msg.type === "reply.done") {
-    if (msg.status === "interrupted") { voiceAgent.pendingToolCalls = []; flushVoicePlayback(); setLiveStatus("INTERRUPTED · pending tools discarded", "warning"); }
-    else { await flushToolCalls(); if (voiceAgent.ready && !voiceAgent.scheduledAudio.length) setVoiceCoreState("ready", `LIVE · ${voiceAgent.sessionId}`); }
-  } else if (msg.type === "session.error") setVoiceCoreState("error", `ERROR · ${msg.code || "session"}: ${msg.message || "unknown"}`);
-  else if (msg.type === "session.ended") { setLiveStatus("SESSION ENDED"); cleanupVoiceAgent(false); }
+
+  if (msg.type === "reply.done") {
+    if (msg.status === "interrupted") {
+      voiceAgent.pendingToolCalls = [];
+      flushVoicePlayback();
+      setLiveStatus("INTERRUPTED · pending tools discarded", "warning");
+    } else {
+      await flushToolCalls();
+      if (voiceAgent.ready && !voiceAgent.scheduledAudio.length) {
+        setVoiceCoreState("ready", `LIVE · ${voiceAgent.sessionId}`);
+      }
+    }
+    return;
+  }
+
+  if (msg.type === "session.error") {
+    setVoiceCoreState("error", `ERROR · ${msg.code || "session"}: ${msg.message || "unknown"}`);
+    return;
+  }
+
+  if (msg.type === "session.ended") {
+    setLiveStatus("SESSION ENDED");
+    cleanupVoiceAgent(false);
+  }
 }
 
 async function startVoiceAgent() {
