@@ -106,6 +106,13 @@ def _normalize_for_broker(text: str) -> str:
         (r"\bswitch off\b", "apaga"),
         (r"\blights\b", "luces"),
         (r"\blight\b", "luz"),
+        (r"\bkitchen\b", "cocina"),
+        (r"\bliving room\b", "living"),
+        (r"\bbedroom\b", "cuarto"),
+        (r"\bstudy\b", "estudio"),
+        (r"\boffice\b", "oficina"),
+        (r"\bentrance\b", "entrada"),
+        (r"\bstorage room\b", "bodega"),
         (r"\bhome status\b", "estado de la casa"),
         (r"\bhouse status\b", "estado de la casa"),
         (r"\bsmart home\b", "domotica"),
@@ -199,6 +206,27 @@ PROTECTED = set(payload.get("protected_tools") or [])
 if operation == "query":
     text = str(payload.get("text") or "")
     calls = ex.detect_tool_calls(user, text)
+
+    # VoiceOps must prefer explicit Home Assistant intent over the broader
+    # lighting/DMX heuristic used by the shared compact voice executor.
+    explicit_ha = bool(re.search(
+        r"\b(home assistant|smart home|dom[oó]tica|estado de la casa|house status|home status|lights?|luces?|switches?|interruptores?)\b",
+        text,
+        re.I,
+    ))
+    explicit_dmx = bool(re.search(
+        r"\b(dmx|artnet|art-net|tacho|tachos|pulpo|pulpos|beam|beams|disco|blackout|escena dmx)\b",
+        text,
+        re.I,
+    ))
+    if explicit_ha and not explicit_dmx:
+        calls = [(name, args) for name, args in calls if not name.startswith("dmx_")]
+        calls.insert(0, ("ha_home_status", {"limit": 35}))
+        if re.search(r"\b(lights?|luces?)\b", text, re.I):
+            calls.insert(1, ("ha_list_entities", {"domain": "light", "limit": 30}))
+        elif re.search(r"\b(switches?|interruptores?|enchufes?)\b", text, re.I):
+            calls.insert(1, ("ha_list_entities", {"domain": "switch", "limit": 30}))
+
     if re.search(r"\b(camera|cameras|camara|cámaras|cam|video|videovigilancia)\b", text, re.I):
         calls.insert(0, ("ha_list_entities", {"domain": "camera", "limit": 30}))
     seen = set()
