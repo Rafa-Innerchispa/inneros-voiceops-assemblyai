@@ -497,26 +497,105 @@ async function executeVoiceTool(call) {
   return {error: `unsupported tool: ${call.name}`};
 }
 
+function compactVoiceToolResult(name, result) {
+  if (!result || typeof result !== "object") return {ok: false, error: "invalid_tool_result"};
+  if (result.error) return {ok: false, error: String(result.error).slice(0, 500)};
+
+  if (name === "query_live_inneros") {
+    return {
+      ok: Boolean(result.ok),
+      summary: String(result.formatted || "").slice(0, 6000),
+      requires_approval: Boolean(result.requires_approval),
+      write_proposals: Array.isArray(result.write_proposals) ? result.write_proposals.slice(0, 3) : []
+    };
+  }
+  if (name === "propose_live_inneros_action" || name === "inspect_and_propose_action") {
+    return {
+      status: result.status,
+      requires_approval: Boolean(result.requires_approval),
+      proposal: result.proposal || null,
+      approval_hint: result.approval_hint || null,
+      production_writes: Boolean(result.production_writes)
+    };
+  }
+  if (name === "recall_verified_context") {
+    const hits = Array.isArray(result.hits) ? result.hits.slice(0, 3).map((hit) => ({
+      summary: hit.summary || hit.text || hit.title || null,
+      truth: hit.truth || null
+    })) : [];
+    return {
+      status: result.status,
+      truth: result.truth,
+      count: result.count || 0,
+      hits
+    };
+  }
+  if (name === "approve_pending_action") {
+    return {
+      status: result.status,
+      approval: result.approval || null,
+      action: result.action || null,
+      production_writes: Boolean(result.production_writes)
+    };
+  }
+  return {ok: true, result};
+}
+
+async function startVoiceToolCall(call) {
+  if (call.name === "recall_verified_context") setOrbit(els.orbitRecall, true, false);
+  if (call.name === "query_live_inneros") setOrbit(els.orbitSystem, true, false);
+  if (call.name === "propose_live_inneros_action") {
+    setOrbit(els.orbitSystem, true, false);
+    setOrbit(els.orbitReason, true, false);
+  }
+  if (call.name === "inspect_and_propose_action") setOrbit(els.orbitReason, true, false);
+  if (call.name === "approve_pending_action") setOrbit(els.orbitPermit, true, false);
+
+  setLiveStatus(`TOOL RUNNING · ${call.name}`, "active");
+  const startedAt = performance.now();
+  try {
+    const result = await executeVoiceTool(call);
+    call.rawResult = result;
+    call.compactResult = compactVoiceToolResult(call.name, result);
+    call.toolMs = Math.round(performance.now() - startedAt);
+    refresh().catch(() => {});
+    setLiveStatus(`TOOL READY · ${call.name} · ${call.toolMs} ms`, "active");
+  } catch (err) {
+    call.rawResult = {error: err.message};
+    call.compactResult = {ok: false, error: String(err.message || err).slice(0, 500)};
+    call.toolMs = Math.round(performance.now() - startedAt);
+    setLiveStatus(`TOOL ERROR · ${call.name} · ${call.compactResult.error}`, "blocked");
+  }
+  return call.compactResult;
+}
+
 async function flushToolCalls() {
   if (!voiceAgent.ws || voiceAgent.ws.readyState !== WebSocket.OPEN) return;
   const calls = voiceAgent.pendingToolCalls.splice(0);
   for (const call of calls) {
-    if (call.name === "recall_verified_context") setOrbit(els.orbitRecall, true, false);
-    if (call.name === "query_live_inneros") setOrbit(els.orbitSystem, true, false);
-    if (call.name === "propose_live_inneros_action") {
-      setOrbit(els.orbitSystem, true, false);
-      setOrbit(els.orbitReason, true, false);
+    let result;
+    try {
+      result = await Promise.race([
+        call.resultPromise || Promise.resolve(call.compactResult || {ok: false, error: "tool_not_started"}),
+        new Promise((resolve) => window.setTimeout(() => resolve({ok: false, error: "tool_timeout"}), 8000))
+      ]);
+    } catch (err) {
+      result = {ok: false, error: String(err.message || err).slice(0, 500)};
     }
-    if (call.name === "inspect_and_propose_action") setOrbit(els.orbitReason, true, false);
-    if (call.name === "approve_pending_action") setOrbit(els.orbitPermit, true, false);
-    let result; try { result = await executeVoiceTool(call); await refresh(); } catch (err) { result = {error: err.message}; }
+
     if ((call.name === "propose_live_inneros_action" || call.name === "inspect_and_propose_action") && !result.error) {
       voiceAgent.ws.send(JSON.stringify(phaseUpdate(result.requires_approval ? "approval" : "complete")));
     } else if (call.name === "approve_pending_action") {
       voiceAgent.ws.send(JSON.stringify(phaseUpdate("complete")));
     }
-    voiceAgent.ws.send(JSON.stringify({type: "tool.result", call_id: call.call_id, result: JSON.stringify(result)}));
+
+    voiceAgent.ws.send(JSON.stringify({
+      type: "tool.result",
+      call_id: call.call_id,
+      result: JSON.stringify(result)
+    }));
     voiceAgent.handledToolCallIds.add(call.call_id);
+    setLiveStatus(`TOOL RESULT SENT · ${call.name} · ${call.toolMs ?? "?"} ms`, result.error ? "blocked" : "active");
   }
 }
 
@@ -604,7 +683,9 @@ async function handleVoiceAgentMessage(event) {
   if (msg.type === "tool.call") {
     const duplicate = voiceAgent.handledToolCallIds.has(msg.call_id) || voiceAgent.pendingToolCalls.some((call) => call.call_id === msg.call_id);
     if (!duplicate) {
-      voiceAgent.pendingToolCalls.push({call_id: msg.call_id, name: msg.name});
+      const call = {call_id: msg.call_id, name: msg.name, arguments: msg.arguments || {}};
+      call.resultPromise = startVoiceToolCall(call);
+      voiceAgent.pendingToolCalls.push(call);
       setLiveStatus(`TOOL REQUEST · ${msg.name}`, "active");
     }
     return;
