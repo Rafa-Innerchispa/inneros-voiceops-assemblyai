@@ -78,7 +78,9 @@ def test_browser_voice_agent_uses_progressive_tools_and_spanish_stt_context() ->
         assert 'tools: [systemStatusTool, recallTool, systemActionTool]' in script
         assert 'tools: [systemStatusTool, recallTool, approveTool]' in script
         assert 'language_codes: ["en", "es"]' in script
-        assert 'output: {voice: "diego"' in script
+        assert 'const voice = uiLanguage === "es" ? "lucia" : "mia";' in script
+        assert 'transcription_mode: "min_latency"' in script
+        assert 'voice_focus: "near-field"' in script
         assert 'name: "query_live_inneros"' in script
         assert 'name: "propose_live_inneros_action"' in script
         assert 'name: "recall_verified_context"' in script
